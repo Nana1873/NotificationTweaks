@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(cmake:*)",
+      "Bash(ctest:*)",
+      "PowerShell(git:*)",
+      "PowerShell(gh:*)",
+      "PowerShell(cmake:*)",
+      "PowerShell(ctest:*)"
+    ]
+  }
+}

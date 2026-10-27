@@ -1,0 +1,34 @@
+# Build and generated output
+/build/
+/dist/
+/.vs/
+/.vscode/
+/vsxmake*/
+/compile_commands.json
+*.obj
+*.pdb
+*.ilk
+*.dll
+*.lib
+*.exp
+
+# Local-only third-party payloads and reference captures
+/vendor/original/
+/vendor/reference/
+/docs/source-docs/
+
+# Skyrim artifacts and archives
+*.pex
+*.esp
+*.esm
+*.esl
+*.bsa
+*.ba2
+*.7z
+*.zip
+*.rar
+
+# Logs and scratch
+*.log
+*.tmp
+*.bak
