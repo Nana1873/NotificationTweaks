@@ -6,6 +6,86 @@ namespace
 {
     constexpr std::uint32_t kBosColor = 0xFF00FF;
 
+    // Full YPS thoughts (sound prefix "[nnnnn]" removed) long enough to be split.
+    std::unordered_set<std::string> g_ypsThoughts;
+
+    void AppendUtf8(std::uint32_t a_code, std::string& a_out)
+    {
+        if (a_code < 0x80) {
+            a_out += static_cast<char>(a_code);
+        } else if (a_code < 0x800) {
+            a_out += static_cast<char>(0xC0 | (a_code >> 6));
+            a_out += static_cast<char>(0x80 | (a_code & 0x3F));
+        } else if (a_code < 0x10000) {
+            a_out += static_cast<char>(0xE0 | (a_code >> 12));
+            a_out += static_cast<char>(0x80 | ((a_code >> 6) & 0x3F));
+            a_out += static_cast<char>(0x80 | (a_code & 0x3F));
+        } else {
+            a_out += static_cast<char>(0xF0 | (a_code >> 18));
+            a_out += static_cast<char>(0x80 | ((a_code >> 12) & 0x3F));
+            a_out += static_cast<char>(0x80 | ((a_code >> 6) & 0x3F));
+            a_out += static_cast<char>(0x80 | (a_code & 0x3F));
+        }
+    }
+
+    // Every JSON string literal in a_json (keys included; they are short and
+    // harmless). Bytes outside escapes are kept as they are, like JsonUtil does.
+    void CollectStrings(std::string_view a_json, std::unordered_set<std::string>& a_out)
+    {
+        for (std::size_t i = 0; i < a_json.size(); ++i) {
+            if (a_json[i] != '"') {
+                continue;
+            }
+            std::string value;
+            for (++i; i < a_json.size() && a_json[i] != '"'; ++i) {
+                if (a_json[i] != '\\' || i + 1 >= a_json.size()) {
+                    value += a_json[i];
+                    continue;
+                }
+                const char escape = a_json[++i];
+                switch (escape) {
+                case 'n':
+                    value += '\n';
+                    break;
+                case 't':
+                    value += '\t';
+                    break;
+                case 'r':
+                    value += '\r';
+                    break;
+                case 'b':
+                case 'f':
+                    break;
+                case 'u':
+                    {
+                        std::uint32_t code = 0;
+                        if (i + 4 < a_json.size() && std::from_chars(a_json.data() + i + 1, a_json.data() + i + 5, code, 16).ec == std::errc{}) {
+                            i += 4;
+                            if (code >= 0xD800 && code < 0xDC00 && i + 6 < a_json.size() && a_json[i + 1] == '\\' && a_json[i + 2] == 'u') {
+                                std::uint32_t low = 0;
+                                if (std::from_chars(a_json.data() + i + 3, a_json.data() + i + 7, low, 16).ec == std::errc{}) {
+                                    code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+                                    i += 6;
+                                }
+                            }
+                            AppendUtf8(code, value);
+                        }
+                        break;
+                    }
+                default:
+                    value += escape;  // \" \\ \/
+                    break;
+                }
+            }
+            if (value.size() > 7 && value[0] == '[' && value[6] == ']') {
+                value.erase(0, 7);
+            }
+            if (value.size() > 60) {
+                a_out.insert(std::move(value));
+            }
+        }
+    }
+
     std::string_view Trim(std::string_view a_text)
     {
         while (!a_text.empty() && (a_text.front() == ' ' || a_text.front() == '\t')) {
@@ -63,18 +143,47 @@ namespace
 
 namespace NT::Merge
 {
-    bool IsYpsSplit(std::string_view a_first, std::string_view a_second)
+    bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit)
     {
         if (a_first.size() < 30 || a_second.empty()) {
             return false;
         }
         const std::string full = std::string(a_first) + " " + std::string(a_second);
         const auto        length = static_cast<std::ptrdiff_t>(full.size());
-        auto              split = std::max<std::ptrdiff_t>(30, length / 2 - 3);
+        if (length <= a_limit) {
+            return false;  // YPS sends thoughts up to its limit unsplit
+        }
+        auto split = std::max<std::ptrdiff_t>(30, length / 2 - 3);
         while (split < length && full[static_cast<std::size_t>(split)] != ' ') {
             ++split;
         }
-        return split == static_cast<std::ptrdiff_t>(a_first.size());
+        if (split != static_cast<std::ptrdiff_t>(a_first.size())) {
+            return false;
+        }
+        if (g_ypsThoughts.empty()) {
+            return full.find('<') == std::string::npos;  // YPS thoughts carry no markup
+        }
+        return g_ypsThoughts.contains(full);
+    }
+
+    void LoadYpsThoughts()
+    {
+        g_ypsThoughts.clear();
+        std::error_code ec;
+        const auto      dir = std::filesystem::absolute("Data/SKSE/Plugins/ypsThoughts", ec);
+        std::size_t     files = 0;
+        if (!ec && std::filesystem::is_directory(dir, ec)) {
+            for (const auto& item : std::filesystem::directory_iterator(dir, ec)) {
+                if (!item.is_regular_file() || item.path().extension() != ".json") {
+                    continue;
+                }
+                std::ifstream file(item.path(), std::ios::binary);
+                const std::string content{ std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
+                CollectStrings(content, g_ypsThoughts);
+                ++files;
+            }
+        }
+        logs::info("YPS thoughts: {} long thought(s) from {} file(s) in {}", g_ypsThoughts.size(), files, dir.string());
     }
 
     bool IsBosContinuation(std::string_view a_first, std::string_view a_second)

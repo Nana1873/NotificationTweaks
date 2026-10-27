@@ -1,4 +1,5 @@
 #include "Capture.h"
+#include "Merge.h"
 #include "MenuIntegration.h"
 #include "Overlay.h"
 #include "SKSEMenuFramework.h"
@@ -37,6 +38,7 @@ namespace
             return;
         }
         NT::LoadSettings();
+        NT::Merge::LoadYpsThoughts();
         // Data/Interface/Translations/NotificationTweaks_<LANGUAGE>.txt
         // (English defaults are compiled in; German ships alongside).
         NT::Translation::Import("NotificationTweaks");

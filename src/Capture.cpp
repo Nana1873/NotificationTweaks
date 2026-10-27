@@ -1,6 +1,7 @@
 #include "Capture.h"
 
 #include "Settings.h"
+#include "Translation.h"
 
 namespace
 {
@@ -25,7 +26,7 @@ namespace
     NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw)
     {
         const auto& s = NT::Config();
-        if (s.mergeYps && NT::Merge::IsYpsSplit(a_previous.raw, a_raw)) {
+        if (s.mergeYps && NT::Merge::IsYpsSplit(a_previous.raw, a_raw, s.ypsLimit)) {
             return NT::Merge::Rule::kYps;
         }
         if (s.mergeBos && NT::Merge::IsBosContinuation(a_previous.raw, a_raw)) {
@@ -105,6 +106,14 @@ namespace NT::Capture
 
     void Push(std::string_view a_raw)
     {
+        // The Vanilla text field translates a lone "$Key" through the
+        // Scaleform translator; keep that (unknown keys stay as sent).
+        std::string translated;
+        if (a_raw.size() > 1 && a_raw.front() == '$' && a_raw.find(' ') == std::string_view::npos) {
+            translated = Translation::Translate(a_raw, a_raw);
+        }
+        const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
+
         const auto& s = Config();
         const auto  now = std::chrono::steady_clock::now();
 
@@ -114,8 +123,8 @@ namespace NT::Capture
             auto&      last = g_entries.back();
             const auto gap = std::chrono::duration<float>(now - last.arrival).count();
             if (gap <= s.mergeWindow && last.count == 1 && last.mergedBy == Merge::Rule::kNone) {
-                if (const auto rule = MatchRule(last, a_raw); rule != Merge::Rule::kNone) {
-                    last.raw = Merge::Join(last.raw, a_raw);
+                if (const auto rule = MatchRule(last, raw); rule != Merge::Rule::kNone) {
+                    last.raw = Merge::Join(last.raw, raw);
                     last.runs = Markup::Parse(last.raw);
                     last.mergedBy = rule;
                     logs::info("Merged ({}, {:.0f} ms): {}", RuleName(rule), gap * 1000.0F, Markup::ToUtf8(last.raw));
@@ -126,7 +135,7 @@ namespace NT::Capture
 
         if (s.stackDuplicates) {
             for (auto& entry : g_entries) {
-                if (entry.raw == a_raw && entry.age < s.fadeIn + s.duration) {
+                if (entry.raw == raw && entry.age < s.fadeIn + s.duration) {
                     ++entry.count;
                     entry.age = std::min(entry.age, s.fadeIn);
                     return;
@@ -136,7 +145,7 @@ namespace NT::Capture
 
         Entry entry;
         entry.id = g_nextID++;
-        entry.raw = std::string(a_raw);
+        entry.raw = std::string(raw);
         entry.runs = Markup::Parse(entry.raw);
         entry.arrival = now;
         logs::info("Notification #{}: {}", entry.id, Markup::ToUtf8(entry.raw));

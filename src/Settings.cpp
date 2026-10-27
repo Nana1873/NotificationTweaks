@@ -104,6 +104,7 @@ namespace NT
         s.mergeBos = ReadBool("Compatibility", "MergeBoS", d.mergeBos, path);
         s.mergeGeneric = ReadBool("Compatibility", "MergeGeneric", d.mergeGeneric, path);
         s.mergeWindow = ReadFloat("Compatibility", "MergeWindow", d.mergeWindow, 0.05F, 2.0F, path);
+        s.ypsLimit = ReadInt("Compatibility", "YPSLimit", d.ypsLimit, 30, 1000, path);
 
         logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {})", path,
             s.enabled, s.posX, s.posY, s.immediate, s.mergeYps, s.mergeBos, s.mergeGeneric);
@@ -150,5 +151,6 @@ namespace NT
         Write("Compatibility", "MergeBoS", b(s.mergeBos), path);
         Write("Compatibility", "MergeGeneric", b(s.mergeGeneric), path);
         Write("Compatibility", "MergeWindow", f(s.mergeWindow), path);
+        Write("Compatibility", "YPSLimit", std::to_string(s.ypsLimit), path);
     }
 }

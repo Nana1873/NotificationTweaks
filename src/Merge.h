@@ -16,8 +16,16 @@ namespace NT::Merge
     // YPS Immersive Fashion (ypsThoughts.psc, playthoughtchoice): a thought
     // longer than LongThoughtLimit is sent as Substring(0, p) and
     // Substring(p + 1), where p is the first space at or after
-    // max(30, len / 2 - 3). True when a + " " + b splits exactly into a/b.
-    bool IsYpsSplit(std::string_view a_first, std::string_view a_second);
+    // max(30, len / 2 - 3). True when a + " " + b is longer than a_limit
+    // (YPS's LongThoughtLimit), splits exactly into a/b and is one of the
+    // thoughts in YPS's databases (see LoadYpsThoughts). The split formula
+    // alone also fits many unrelated pairs of similar length.
+    bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit);
+
+    // Reads every string from Data/SKSE/Plugins/ypsThoughts/*.json (YPS and
+    // translation overrides through the MO2 VFS). kDataLoaded. Without any
+    // database the YPS rule falls back to the split formula on plain text.
+    void LoadYpsThoughts();
 
     // Bimbos of Skyrim wraps its thoughts in <font color="#FF00FF">. A second
     // line in the same wrapping color continues the first when the first

@@ -155,6 +155,7 @@ namespace
                 s.mergeBos = keep.mergeBos;
                 s.mergeGeneric = keep.mergeGeneric;
                 s.mergeWindow = keep.mergeWindow;
+                s.ypsLimit = keep.ypsLimit;
                 NT::SaveSettings();
             } else {
                 g_confirmUntil = now + kConfirmSeconds;

@@ -55,6 +55,7 @@ namespace NT
         bool  mergeBos = true;      // Bimbos of Skyrim: continuation in the same <font> color
         bool  mergeGeneric = false; // any two lines: no sentence end + lowercase continuation
         float mergeWindow = 0.35F;  // seconds the second half may arrive after the first
+        int   ypsLimit = 80;        // YPS LongThoughtLimit (MCM); only longer thoughts are split
     };
 
     Settings& Config();
