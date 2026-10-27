@@ -1,0 +1,301 @@
+#include "MenuIntegration.h"
+
+#include "Capture.h"
+#include "Merge.h"
+#include "Overlay.h"
+#include "SKSEMenuFramework.h"
+#include "Settings.h"
+#include "Translation.h"
+
+namespace
+{
+    constexpr auto kSectionName = "Notification Tweaks";
+
+    // Two-click confirmation for the reset button.
+    constexpr double kConfirmSeconds = 4.0;
+    double           g_confirmUntil = 0.0;
+
+    SKSEMenuFramework::Model::WindowInterface* g_positionWindow = nullptr;
+
+    // Saves after a slider or drag was released, or right away for
+    // checkboxes and combos (a_changedNow).
+    void Commit(bool a_changedNow = false)
+    {
+        if (a_changedNow || ImGuiMCP::IsItemDeactivatedAfterEdit()) {
+            NT::SaveSettings();
+        }
+    }
+
+    void Tooltip(const std::string& a_text)
+    {
+        if (ImGuiMCP::IsItemHovered()) {
+            ImGuiMCP::SetTooltip("%s", a_text.c_str());
+        }
+    }
+
+    // Slider showing a 0..1 fraction as percent.
+    void PercentSlider(const std::string& a_label, const char* a_id, float& a_value, float a_min, float a_max)
+    {
+        float percent = a_value * 100.0F;
+        if (ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &percent, a_min * 100.0F, a_max * 100.0F, "%.1f%%")) {
+            a_value = percent / 100.0F;
+        }
+        Commit();
+    }
+
+    void SecondsSlider(const std::string& a_label, const char* a_id, float& a_value, float a_min, float a_max)
+    {
+        ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &a_value, a_min, a_max, "%.2f s");
+        Commit();
+    }
+
+    bool Combo(const std::string& a_label, const char* a_id, int& a_index, const std::vector<const std::string*>& a_items)
+    {
+        bool changed = false;
+        const auto preview = a_index >= 0 && a_index < static_cast<int>(a_items.size()) ? a_items[static_cast<std::size_t>(a_index)]->c_str() : "";
+        if (ImGuiMCP::BeginCombo((a_label + a_id).c_str(), preview)) {
+            for (int i = 0; i < static_cast<int>(a_items.size()); ++i) {
+                if (ImGuiMCP::Selectable(a_items[static_cast<std::size_t>(i)]->c_str(), i == a_index)) {
+                    a_index = i;
+                    changed = true;
+                }
+            }
+            ImGuiMCP::EndCombo();
+        }
+        return changed;
+    }
+
+    void RenderFontCombo()
+    {
+        const auto& t = NT::Translation::S();
+        auto&       s = NT::Config();
+        const auto  names = NT::Overlay::FontNames();
+        const auto  preview = s.font.empty() ? t.fontDefault : s.font;
+        if (ImGuiMCP::BeginCombo((t.font + "##font").c_str(), preview.c_str())) {
+            if (ImGuiMCP::Selectable(t.fontDefault.c_str(), s.font.empty())) {
+                s.font.clear();
+                NT::SaveSettings();
+            }
+            for (const auto& name : names) {
+                if (ImGuiMCP::Selectable(name.c_str(), name == s.font)) {
+                    s.font = name;
+                    NT::SaveSettings();
+                }
+            }
+            ImGuiMCP::EndCombo();
+        }
+    }
+
+    void OpenPositioning()
+    {
+        if (!g_positionWindow) {
+            return;
+        }
+        NT::Overlay::SetPositioning(true);
+        g_positionWindow->IsOpen = true;
+        if (auto* main = SKSEMenuFramework::GetMainWindow()) {
+            main->IsOpen = false;
+        }
+    }
+
+    void ClosePositioning()
+    {
+        NT::Overlay::SetPositioning(false);
+        NT::SaveSettings();
+        if (g_positionWindow) {
+            g_positionWindow->IsOpen = false;
+        }
+        if (auto* main = SKSEMenuFramework::GetMainWindow()) {
+            main->IsOpen = true;
+        }
+    }
+
+    // Small window shown while dragging: hint, fine sliders and Done.
+    void __stdcall RenderPositionWindow()
+    {
+        const auto& t = NT::Translation::S();
+        auto&       s = NT::Config();
+        auto*       viewport = ImGuiMCP::GetMainViewport();
+        ImGuiMCP::SetNextWindowPos({ viewport->Size.x * 0.5F, viewport->Size.y * 0.82F }, ImGuiMCP::ImGuiCond_Appearing, { 0.5F, 0.5F });
+        bool open = true;
+        if (ImGuiMCP::Begin((t.posWindowTitle + "###NTPosition").c_str(), &open,
+                ImGuiMCP::ImGuiWindowFlags_AlwaysAutoResize | ImGuiMCP::ImGuiWindowFlags_NoCollapse)) {
+            ImGuiMCP::TextUnformatted(t.posWindowHint.c_str());
+            PercentSlider(t.posX, "##posx", s.posX, 0.0F, 1.0F);
+            PercentSlider(t.posY, "##posy", s.posY, 0.0F, 1.0F);
+            int align = static_cast<int>(s.align);
+            if (Combo(t.align, "##palign", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
+                s.align = static_cast<NT::Align>(align);
+                NT::SaveSettings();
+            }
+            if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
+                open = false;
+            }
+        }
+        ImGuiMCP::End();
+        if (!open) {
+            ClosePositioning();
+        }
+    }
+
+    void RenderResetDisplay()
+    {
+        const auto& t = NT::Translation::S();
+        const auto  now = ImGuiMCP::GetTime();
+        const bool  armed = now < g_confirmUntil;
+        if (ImGuiMCP::Button(((armed ? t.resetConfirm : t.resetDisplay) + "##reset").c_str())) {
+            if (armed) {
+                g_confirmUntil = 0.0;
+                auto&              s = NT::Config();
+                const NT::Settings d;
+                const auto         keep = s;
+                s = d;
+                s.enabled = keep.enabled;
+                s.mergeYps = keep.mergeYps;
+                s.mergeBos = keep.mergeBos;
+                s.mergeGeneric = keep.mergeGeneric;
+                s.mergeWindow = keep.mergeWindow;
+                NT::SaveSettings();
+            } else {
+                g_confirmUntil = now + kConfirmSeconds;
+            }
+        }
+    }
+
+    void __stdcall RenderDisplay()
+    {
+        const auto& t = NT::Translation::S();
+        auto&       s = NT::Config();
+
+        Commit(ImGuiMCP::Checkbox((t.enabled + "##enabled").c_str(), &s.enabled));
+        Tooltip(t.enabledTip);
+
+        ImGuiMCP::SeparatorText(t.headPosition.c_str());
+        if (ImGuiMCP::Button((t.dragButton + "##drag").c_str())) {
+            OpenPositioning();
+        }
+        Tooltip(t.dragTip);
+        PercentSlider(t.posX, "##posx", s.posX, 0.0F, 1.0F);
+        PercentSlider(t.posY, "##posy", s.posY, 0.0F, 1.0F);
+        int align = static_cast<int>(s.align);
+        if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
+            s.align = static_cast<NT::Align>(align);
+            NT::SaveSettings();
+        }
+        Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
+        PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, 0.1F, 1.0F);
+        ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, 1, 20);
+        Commit();
+
+        ImGuiMCP::SeparatorText(t.headStyle.c_str());
+        RenderFontCombo();
+        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, 8.0F, 96.0F, "%.0f px");
+        Commit();
+        ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, 0.0F, 40.0F, "%.0f px");
+        Commit();
+        ImGuiMCP::ColorEdit4((t.textColor + "##color").c_str(), s.textColor);
+        Commit();
+        int effect = static_cast<int>(s.effect);
+        if (Combo(t.effect, "##effect", effect, { &t.effectNone, &t.effectShadow, &t.effectOutline })) {
+            s.effect = static_cast<NT::TextEffect>(effect);
+            NT::SaveSettings();
+        }
+        PercentSlider(t.background, "##background", s.backgroundAlpha, 0.0F, 1.0F);
+
+        ImGuiMCP::SeparatorText(t.headTiming.c_str());
+        Commit(ImGuiMCP::Checkbox((t.immediate + "##immediate").c_str(), &s.immediate));
+        Tooltip(t.immediateTip);
+        if (!s.immediate) {
+            SecondsSlider(t.queueDelay, "##queuedelay", s.queueDelay, 0.1F, 5.0F);
+        }
+        SecondsSlider(t.duration, "##duration", s.duration, 0.5F, 30.0F);
+        SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, 0.0F, 3.0F);
+        SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, 0.0F, 5.0F);
+        Commit(ImGuiMCP::Checkbox((t.stack + "##stack").c_str(), &s.stackDuplicates));
+
+        ImGuiMCP::SeparatorText(t.headTest.c_str());
+        if (ImGuiMCP::Button((t.test1 + "##test1").c_str())) {
+            NT::Capture::SendTest({ t.testText });
+        }
+        ImGuiMCP::SameLine();
+        if (ImGuiMCP::Button((t.testMany + "##testmany").c_str())) {
+            std::vector<std::string> texts;
+            for (int i = 1; i <= 4; ++i) {
+                texts.push_back(std::format("{} {}", t.testManyText, i));
+            }
+            NT::Capture::SendTest(std::move(texts));
+        }
+        ImGuiMCP::SameLine();
+        RenderResetDisplay();
+
+        ImGuiMCP::Spacing();
+        ImGuiMCP::TextDisabled("%s", t.footer.c_str());
+    }
+
+    // Splits a_text exactly like ypsThoughts.psc does, for the test button.
+    std::vector<std::string> YpsSplit(const std::string& a_text)
+    {
+        const auto length = static_cast<std::ptrdiff_t>(a_text.size());
+        auto       split = std::max<std::ptrdiff_t>(30, length / 2 - 3);
+        while (split < length && a_text[static_cast<std::size_t>(split)] != ' ') {
+            ++split;
+        }
+        if (split >= length) {
+            return { a_text };
+        }
+        return { a_text.substr(0, static_cast<std::size_t>(split)), a_text.substr(static_cast<std::size_t>(split) + 1) };
+    }
+
+    void __stdcall RenderCompat()
+    {
+        const auto& t = NT::Translation::S();
+        auto&       s = NT::Config();
+
+        ImGuiMCP::TextWrapped("%s", t.compatHint.c_str());
+        ImGuiMCP::Spacing();
+        Commit(ImGuiMCP::Checkbox((t.mergeYps + "##yps").c_str(), &s.mergeYps));
+        Tooltip(t.mergeYpsTip);
+        Commit(ImGuiMCP::Checkbox((t.mergeBos + "##bos").c_str(), &s.mergeBos));
+        Tooltip(t.mergeBosTip);
+        Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
+        Tooltip(t.mergeGenericTip);
+        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, 0.05F, 2.0F);
+
+        ImGuiMCP::SeparatorText(t.headTest.c_str());
+        if (ImGuiMCP::Button((t.testYps + "##testyps").c_str())) {
+            NT::Capture::SendTest(YpsSplit(t.testYpsText));
+        }
+        ImGuiMCP::SameLine();
+        if (ImGuiMCP::Button((t.testBos + "##testbos").c_str())) {
+            NT::Capture::SendTest({ "<font color=\"#FF00FF\">" + t.testBosFirst + "</font>", "<font color=\"#FF00FF\">" + t.testBosSecond + "</font>" });
+        }
+
+        ImGuiMCP::Spacing();
+        ImGuiMCP::TextDisabled("%s", t.footer.c_str());
+    }
+
+    // Leaving the menu ends positioning even when the window was not closed
+    // through Done.
+    void __stdcall OnMenuEvent(SKSEMenuFramework::Model::EventType a_type)
+    {
+        if (a_type == SKSEMenuFramework::Model::kCloseMenu && NT::Overlay::IsPositioning() && g_positionWindow && !g_positionWindow->IsOpen) {
+            NT::Overlay::SetPositioning(false);
+            NT::SaveSettings();
+        }
+    }
+}
+
+namespace NT::MenuIntegration
+{
+    void Initialize()
+    {
+        const auto& t = NT::Translation::S();
+        SKSEMenuFramework::SetSection(kSectionName);
+        SKSEMenuFramework::AddSectionItem(t.pageDisplay, RenderDisplay);
+        SKSEMenuFramework::AddSectionItem(t.pageCompat, RenderCompat);
+        g_positionWindow = SKSEMenuFramework::AddWindow(RenderPositionWindow, true);
+        SKSEMenuFramework::AddEvent(OnMenuEvent, 0.0F);
+        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}'", kSectionName,
+            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageCompat);
+    }
+}
