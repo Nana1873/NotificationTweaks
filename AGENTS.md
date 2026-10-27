@@ -10,7 +10,7 @@ working on this project.
 - **Shared lab root**: `E:/DevProjects/MO2 Dev Setup/`
 - **Canonical MO2 runtime**: `E:/Modlisten/SkyrimAE/`
 - **MO2 profile**: `E:/Modlisten/SkyrimAE/profiles/Default/`
-- **MO2 dev mod target**: `E:/Modlisten/SkyrimAE/mods/Notification Tweaks Dev/`
+- **MO2 dev mod target**: `E:/Modlisten/SkyrimAE/mods/houseCARL - Notification Tweaks Dev/`
 - **Runtime logs**: `D:/Dokumente/My Games/Skyrim Special Edition/SKSE/` and `D:/Dokumente/My Games/Skyrim Special Edition/Logs/Script/`
 
 Use this workspace for source, tests, docs, and build/deploy scripts. Use the
@@ -37,7 +37,7 @@ through the shared lab's MO2 helper:
 ```
 
 Do not start `E:\Modlisten\SkyrimAE\Game Root\skse64_loader.exe` directly for
-runtime tests â€” a direct launch bypasses MO2/USVFS.
+runtime tests - a direct launch bypasses MO2/USVFS.
 
 For game-binary inspection (native crashes, SKSE hook targets, undocumented
 engine behavior), follow the shared lab `AGENTS.md` "Shared Tools" Ghidra rules
@@ -48,56 +48,28 @@ respect existing listener/process/project locks. Stop the MCP session before
 opening or rebuilding that same project. An inspection request does not call
 for `python run.py`, a new import, or a Ghidra/LLVM download.
 
-## GitHub Coordination
+## Coordination
 
-<!-- Remove this whole section if this workspace stays local-only. -->
+The repository is published at https://github.com/Nana1873/NotificationTweaks
+(public, source only; release archives go to Nexus Mods). Work happens on
+`main`; coordinate through commits and short notes in `docs/`, and push
+`main` when a slice is done and verified. Use a lab-root worktree only for
+parallel sessions. Runtime deploys and game launches follow the lab runtime
+mutex.
 
-Multiple agents (Claude Code, Codex) work on this repo in parallel. GitHub is
-the coordination layer: Issues are the task queue, PRs are the only way into
-`main`. CI only runs a light `pr-hygiene` check; real verification stays
-local.
+## Build, Deploy, Package, Strings
 
-### Task queue
-
-- Only start coding against an open issue labeled `status:ready`. Exception:
-  trivial fixes (a few lines) may go straight to a PR labeled `no-issue`.
-- Issue labels: `status:ready`, `status:in-progress`, `status:blocked`, plus
-  one `type:*` label. An open PR referencing the issue is the review state.
-- New tasks use the "Agent task" issue template
-  (`.github/ISSUE_TEMPLATE/agent_task.yml`).
-
-### Claim protocol
-
-All agents act as the same GitHub user, so the assignee field cannot prevent
-collisions. Labels plus a claim comment are the lock:
-
-1. `gh issue list --label "status:ready" --state open`
-2. Read the issue comments. If a claim comment exists and the issue is
-   `status:in-progress`, pick another issue.
-3. Claim it:
-   `gh issue edit <N> --remove-label "status:ready" --add-label "status:in-progress"`
-   then comment `Claimed by <claude|codex>, branch <prefix>/<N>-<slug>`.
-4. If you abandon the issue, swap the labels back and comment why.
-
-### Branches and PRs
-
-- Branch names: `codex/<issue#>-<slug>` (Codex) or `claude/<issue#>-<slug>`
-  (Claude Code), always cut from fresh `main`. Never commit to `main`
-  directly.
-- One issue = one branch = one PR against `main`.
-- The PR body must contain `Closes #<issue>` and the filled checklist from
-  `.github/PULL_REQUEST_TEMPLATE.md`.
-
-### Parallel sessions (git worktrees)
-
-- One worktree per issue/branch. Worktrees live at the lab root:
-  `E:\DevProjects\MO2 Dev Setup\worktrees\<repo-slug>-<slug>`. Never create
-  worktrees inside `workspaces\`.
-- Create: `git worktree add "..\..\worktrees\<repo-slug>-<slug>" -b <prefix>/<N>-<slug> main`
-- Remove after merge: `git worktree remove "..\..\worktrees\<repo-slug>-<slug>"`,
-  then `git worktree prune`.
-- **Runtime deploy is a mutex**: only one session may deploy to MO2 or launch
-  Skyrim at a time, across all workspaces (lab AGENTS.md "Runtime mutex").
+- `tools\build.ps1` builds `build\release\NotificationTweaks.dll` (CMake,
+  Ninja, vcpkg via `VCPKG_ROOT`, CommonLibSSE-NG submodule
+  `extern/commonlibsse-ng`; Visual Studio is found through vswhere).
+- `tools\deploy.ps1 [-Register]` copies DLL, PDB and translations into the
+  SkyrimAE mod `houseCARL - Notification Tweaks Dev`; `-Register` adds it to
+  `modlist.txt` and refuses while MO2 runs. Quit the game first: it keeps
+  the DLL and the build PDB open.
+- `tools\package.ps1` writes `dist\NotificationTweaks-<version>.zip` for
+  Nexus (DLL, translations, license, third-party notices; no PDB).
+- `python -I tools\strings.py` regenerates `src/Translation.h`, the
+  `LoadStrings()` body and both translation files from one table.
 
 ## Git Safety
 

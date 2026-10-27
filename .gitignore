@@ -32,3 +32,6 @@
 *.log
 *.tmp
 *.bak
+
+# Nexus page text stays local, not part of the public repo
+/docs/nexus-page.md
