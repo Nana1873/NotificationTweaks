@@ -160,10 +160,14 @@ namespace NT::Merge
         if (split != static_cast<std::ptrdiff_t>(a_first.size())) {
             return false;
         }
-        if (g_ypsThoughts.empty()) {
-            return full.find('<') == std::string::npos;  // YPS thoughts carry no markup
+        if (g_ypsThoughts.contains(full)) {
+            return true;
         }
-        return g_ypsThoughts.contains(full);
+        // YpsPiercingTicker.shownotification splits its ~500 narration lines
+        // (with actor names, so in no database) the same way. Those carry no
+        // markup; a first half that ends a sentence is far more likely to be
+        // a separate message than a split, so it stays apart.
+        return full.find('<') == std::string::npos && !EndsSentence(a_first);
     }
 
     void LoadYpsThoughts()
