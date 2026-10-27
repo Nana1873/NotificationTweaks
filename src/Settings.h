@@ -62,7 +62,28 @@ namespace NT
         int   ypsLimit = 80;        // YPS LongThoughtLimit (MCM); only longer thoughts are split
     };
 
+    // The values the game thread reads while capturing. The menu and the
+    // overlay own Settings on the render thread; LoadSettings/SaveSettings
+    // publish this copy under a lock, so the game thread never reads
+    // Settings itself.
+    struct CaptureSettings
+    {
+        bool  enabled = true;
+        bool  stackDuplicates = true;
+        bool  mergeYps = true;
+        bool  mergeBos = true;
+        bool  mergeGeneric = false;
+        float mergeWindow = 0.35F;
+        float visibleTime = 4.15F;  // fadeIn + duration: how long a line counts for stacking
+        float fadeIn = 0.15F;
+        int   ypsLimit = 80;
+    };
+
+    // Render/menu thread (and startup): the full settings.
     Settings& Config();
     void      LoadSettings();
     void      SaveSettings();
+
+    // Any thread: a copy of the capture values as last loaded or saved.
+    CaptureSettings CaptureConfig();
 }

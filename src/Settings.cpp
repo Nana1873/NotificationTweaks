@@ -8,6 +8,26 @@ namespace
 
     NT::Settings g_settings;
 
+    std::mutex          g_captureLock;
+    NT::CaptureSettings g_capture;
+
+    void PublishCapture()
+    {
+        const auto&         s = g_settings;
+        NT::CaptureSettings c;
+        c.enabled = s.enabled;
+        c.stackDuplicates = s.stackDuplicates;
+        c.mergeYps = s.mergeYps;
+        c.mergeBos = s.mergeBos;
+        c.mergeGeneric = s.mergeGeneric;
+        c.mergeWindow = s.mergeWindow;
+        c.visibleTime = s.fadeIn + s.duration;
+        c.fadeIn = s.fadeIn;
+        c.ypsLimit = s.ypsLimit;
+        std::scoped_lock lock{ g_captureLock };
+        g_capture = c;
+    }
+
     std::string IniPath()
     {
         std::error_code ec;
@@ -109,6 +129,7 @@ namespace NT
         s.mergeWindow = ReadFloat("Compatibility", "MergeWindow", d.mergeWindow, 0.05F, 2.0F, path);
         s.ypsLimit = ReadInt("Compatibility", "YPSLimit", d.ypsLimit, 30, 1000, path);
 
+        PublishCapture();
         logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {})", path,
             s.enabled, s.posX, s.posY, s.immediate, s.mergeYps, s.mergeBos, s.mergeGeneric);
     }
@@ -159,5 +180,12 @@ namespace NT
         Write("Compatibility", "MergeGeneric", b(s.mergeGeneric), path);
         Write("Compatibility", "MergeWindow", f(s.mergeWindow), path);
         Write("Compatibility", "YPSLimit", std::to_string(s.ypsLimit), path);
+        PublishCapture();
+    }
+
+    CaptureSettings CaptureConfig()
+    {
+        std::scoped_lock lock{ g_captureLock };
+        return g_capture;
     }
 }

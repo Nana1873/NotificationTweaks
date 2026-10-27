@@ -62,9 +62,9 @@ namespace
         }
     }
 
-    NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw)
+    NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw, const NT::CaptureSettings& a_settings)
     {
-        const auto& s = NT::Config();
+        const auto& s = a_settings;
         if (a_previous.raw == a_raw) {
             return NT::Merge::Rule::kNone;  // a repeat, handled by stacking
         }
@@ -91,7 +91,7 @@ namespace
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
                     data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
                     const char* text = data->text.c_str();
-                    if (!NT::Config().enabled) {
+                    if (!NT::CaptureConfig().enabled) {
                         if (text && *text) {
                             RecordOnly(text);
                         }
@@ -115,7 +115,7 @@ namespace
     {
         static void thunk(RE::HUDNotifications* a_this)
         {
-            if (NT::Config().enabled && a_this) {
+            if (a_this && NT::CaptureConfig().enabled) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
                     if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word) {
@@ -126,6 +126,11 @@ namespace
                         }
                         if (const char* text = it->text.c_str(); text && *text) {
                             NT::Capture::Push(text);
+                        }
+                        // Vanilla plays a queued entry's sound when it shows the
+                        // line; the entry is gone after this, so play it here.
+                        if (const char* sound = it->sound.c_str(); sound && *sound) {
+                            RE::PlaySound(sound);
                         }
                         it = queue.erase(it);
                     } else {
@@ -162,7 +167,7 @@ namespace NT::Capture
         }
         const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
 
-        const auto& s = Config();
+        const auto s = CaptureConfig();
         const auto  now = std::chrono::steady_clock::now();
 
         std::scoped_lock lock{ g_lock };
@@ -171,7 +176,7 @@ namespace NT::Capture
             auto&      last = g_entries.back();
             const auto gap = std::chrono::duration<float>(now - last.arrival).count();
             if (gap <= s.mergeWindow && last.count == 1 && last.mergedBy == Merge::Rule::kNone) {
-                if (const auto rule = MatchRule(last, raw); rule != Merge::Rule::kNone) {
+                if (const auto rule = MatchRule(last, raw, s); rule != Merge::Rule::kNone) {
                     last.raw = Merge::Join(last.raw, raw);
                     last.runs = Markup::Parse(last.raw);
                     last.mergedBy = rule;
@@ -186,7 +191,7 @@ namespace NT::Capture
 
         if (s.stackDuplicates) {
             for (auto& entry : g_entries) {
-                if (entry.raw == raw && entry.age < s.fadeIn + s.duration) {
+                if (entry.raw == raw && entry.age < s.visibleTime) {
                     ++entry.count;
                     entry.age = std::min(entry.age, s.fadeIn);
                     if (auto* history = FindHistory(entry.id)) {

@@ -19,6 +19,14 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   queue before Vanilla shows them. In every test so far all lines came
   through the first hook; the net never logged.
 - Quest, skill, level and other `HUDNotifications` types stay Vanilla.
+- Sounds: `HUDData` has no sound field, so a sound passed to
+  `ShowHUDMessage` cannot ride the first path. Queue entries do carry one;
+  the Update hook plays it before erasing the entry.
+- Threads: the hooks run on the game thread, overlay and menu on the
+  framework's render callback. The game thread never reads `Settings`; it
+  reads `CaptureSettings`, a copy published under a lock by
+  `LoadSettings`/`SaveSettings`. Entries and history share `g_lock`; the
+  overlay and the history page copy them out before drawing.
 - A notification that is exactly one `$Key` is translated through the
   Scaleform translator (read-only), like the Vanilla text field does
   (seen: `$Initialization_Start` from Racial Skin Variance).
