@@ -26,8 +26,16 @@ namespace
         spdlog::set_pattern("[%H:%M:%S:%e] [%l] %v"s);
     }
 
+    bool g_active = false;
+
     void MessageHandler(SKSE::MessagingInterface::Message* a_message)
     {
+        if (a_message->type == SKSE::MessagingInterface::kPreLoadGame || a_message->type == SKSE::MessagingInterface::kNewGame) {
+            if (g_active) {
+                NT::Capture::ClearActive();
+            }
+            return;
+        }
         if (a_message->type != SKSE::MessagingInterface::kDataLoaded) {
             return;
         }
@@ -46,6 +54,7 @@ namespace
         NT::Capture::Install();
         NT::Overlay::Initialize();
         NT::MenuIntegration::Initialize();
+        g_active = true;
     }
 }
 

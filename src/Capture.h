@@ -43,6 +43,11 @@ namespace NT::Capture
     // Overlay thread: exclusive access to the live entries, oldest first.
     void Visit(const std::function<void(std::deque<Entry>&)>& a_visitor);
 
+    // Main thread, before a save is loaded or a new game starts: drops the
+    // lines of the previous session so they do not show up in the new one.
+    // Loading screens inside a session keep them (they wait, see Overlay).
+    void ClearActive();
+
     // Menu thread: the history, oldest first, and clearing it.
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor);
     void ClearHistory();

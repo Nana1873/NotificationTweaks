@@ -216,6 +216,15 @@ namespace NT::Capture
         a_visitor(g_entries);
     }
 
+    void ClearActive()
+    {
+        std::scoped_lock lock{ g_lock };
+        if (!g_entries.empty()) {
+            logs::info("Dropped {} pending notification(s) of the previous session", g_entries.size());
+        }
+        g_entries.clear();
+    }
+
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor)
     {
         std::scoped_lock lock{ g_lock };
