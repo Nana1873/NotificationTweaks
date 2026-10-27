@@ -65,6 +65,9 @@ namespace
     NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw)
     {
         const auto& s = NT::Config();
+        if (a_previous.raw == a_raw) {
+            return NT::Merge::Rule::kNone;  // a repeat, handled by stacking
+        }
         if (s.mergeYps && NT::Merge::IsYpsSplit(a_previous.raw, a_raw, s.ypsLimit)) {
             return NT::Merge::Rule::kYps;
         }
@@ -115,7 +118,7 @@ namespace
             if (NT::Config().enabled && a_this) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
-                    if (it->type.all(RE::HUD_MESSAGE_TYPE::kNotification) && !it->quest && !it->word) {
+                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word) {
                         static bool logged = false;
                         if (!logged) {
                             logged = true;
@@ -175,7 +178,7 @@ namespace NT::Capture
                     if (auto* history = FindHistory(last.id)) {
                         SetHistoryText(*history, last.raw);
                     }
-                    logs::info("Merged ({}, {:.0f} ms): {}", RuleName(rule), gap * 1000.0F, Markup::ToUtf8(last.raw));
+                    logs::debug("Merged ({}, {:.0f} ms): {}", RuleName(rule), gap * 1000.0F, Markup::ToUtf8(last.raw));
                     return;
                 }
             }
@@ -200,7 +203,7 @@ namespace NT::Capture
         entry.raw = std::string(raw);
         entry.runs = Markup::Parse(entry.raw);
         entry.arrival = now;
-        logs::info("Notification #{}: {}", entry.id, Markup::ToUtf8(entry.raw));
+        logs::debug("Notification #{}: {}", entry.id, Markup::ToUtf8(entry.raw));
         AddHistory(entry.id, entry.raw);
         g_entries.push_back(std::move(entry));
 

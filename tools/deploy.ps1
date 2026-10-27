@@ -2,16 +2,20 @@
 # "houseCARL - Notification Tweaks Dev". With -Register the mod is also added
 # (enabled) to profiles\Default\modlist.txt, right above Quick Audio Sliders
 # Dev; that step refuses to run while MO2 is open (MO2 rewrites the file).
-# Usage: .\tools\deploy.ps1 [-Preset release] [-Register]
+# Dev helper for the author's MO2 instance; pass -Instance and -ModName for
+# another one (the modlist anchor falls back to the top of the list).
+# Usage: .\tools\deploy.ps1 [-Preset release] [-Register] [-Instance <MO2 folder>] [-ModName <mod>]
 [CmdletBinding()]
 param(
     [string]$Preset = 'release',
-    [switch]$Register
+    [switch]$Register,
+    [string]$Instance = 'E:\Modlisten\SkyrimAE',
+    [string]$ModName = 'houseCARL - Notification Tweaks Dev'
 )
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$instance = 'E:\Modlisten\SkyrimAE'
-$modName = 'houseCARL - Notification Tweaks Dev'
+$instance = $Instance
+$modName = $ModName
 $mod = Join-Path $instance "mods\$modName"
 
 if (Get-Process SkyrimSE -ErrorAction SilentlyContinue) { throw 'Skyrim is running; quit it before deploying (the DLL is locked).' }

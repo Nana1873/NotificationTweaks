@@ -18,6 +18,9 @@ namespace
 
     SKSEMenuFramework::Model::WindowInterface* g_positionWindow = nullptr;
 
+    // Ctrl+Click lets the player type a value; keep it inside the range.
+    constexpr auto kClamp = ImGuiMCP::ImGuiSliderFlags_AlwaysClamp;
+
     // Saves after a slider or drag was released, or right away for
     // checkboxes and combos (a_changedNow).
     void Commit(bool a_changedNow = false)
@@ -38,7 +41,7 @@ namespace
     void PercentSlider(const std::string& a_label, const char* a_id, float& a_value, float a_min, float a_max)
     {
         float percent = a_value * 100.0F;
-        if (ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &percent, a_min * 100.0F, a_max * 100.0F, "%.1f%%")) {
+        if (ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &percent, a_min * 100.0F, a_max * 100.0F, "%.1f%%", kClamp)) {
             a_value = percent / 100.0F;
         }
         Commit();
@@ -46,7 +49,7 @@ namespace
 
     void SecondsSlider(const std::string& a_label, const char* a_id, float& a_value, float a_min, float a_max)
     {
-        ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &a_value, a_min, a_max, "%.2f s");
+        ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &a_value, a_min, a_max, "%.2f s", kClamp);
         Commit();
     }
 
@@ -152,6 +155,7 @@ namespace
                 const auto         keep = s;
                 s = d;
                 s.enabled = keep.enabled;
+                s.verboseLog = keep.verboseLog;
                 s.mergeYps = keep.mergeYps;
                 s.mergeBos = keep.mergeBos;
                 s.mergeGeneric = keep.mergeGeneric;
@@ -185,7 +189,7 @@ namespace
 
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
-        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, 8.0F, 72.0F, "%.0f px");
+        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, 8.0F, 72.0F, "%.0f px", kClamp);
         Commit();
         Tooltip(t.fontSizeTip);
         ImGuiMCP::ColorEdit4((t.textColor + "##color").c_str(), s.textColor);
@@ -214,9 +218,9 @@ namespace
             Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
             Tooltip(t.showInMenusTip);
             PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, 0.1F, 1.0F);
-            ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, 1, 20);
+            ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, 1, 20, "%d", kClamp);
             Commit();
-            ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, 0.0F, 30.0F, "%.0f px");
+            ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, 0.0F, 30.0F, "%.0f px", kClamp);
             Commit();
             PercentSlider(t.background, "##background", s.backgroundAlpha, 0.0F, 1.0F);
             SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, 0.0F, 3.0F);
@@ -317,9 +321,11 @@ namespace
 
         const auto needle = Lowercase(filter);
         if (ImGuiMCP::BeginChild("##historylist", { 0.0F, 0.0F })) {
-            bool any = false;
-            NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) {
-                for (auto it = a_history.rbegin(); it != a_history.rend(); ++it) {
+            bool                                  any = false;
+            std::deque<NT::Capture::HistoryEntry> history;
+            NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) { history = a_history; });
+            {
+                for (auto it = history.rbegin(); it != history.rend(); ++it) {
                     if (!needle.empty() && Lowercase(it->text).find(needle) == std::wstring::npos) {
                         continue;
                     }
@@ -338,7 +344,7 @@ namespace
                         ImGuiMCP::PopStyleColor();
                     }
                 }
-            });
+            }
             if (!any) {
                 ImGuiMCP::TextDisabled("%s", t.historyEmpty.c_str());
             }

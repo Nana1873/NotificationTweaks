@@ -95,7 +95,8 @@ namespace
             std::uint32_t delim = 0;
             for (std::uint32_t i = 0; i < len; ++i) {
                 if (buf[i] == L'\t') {
-                    delim = i;
+                    delim = i;  // keys never contain a tab; values may
+                    break;
                 }
             }
             if (delim < 2) {
@@ -254,7 +255,6 @@ namespace NT::Translation
         g_strings.testYpsText = Translate("$NT_TestYpsText", defaults.testYpsText);
         g_strings.testBosFirst = Translate("$NT_TestBosFirst", defaults.testBosFirst);
         g_strings.testBosSecond = Translate("$NT_TestBosSecond", defaults.testBosSecond);
-        g_strings.waiting = Translate("$NT_Waiting", defaults.waiting);
         logs::info("UI strings loaded ('{}')", g_strings.pageDisplay);
     }
 

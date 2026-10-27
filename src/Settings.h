@@ -23,6 +23,7 @@ namespace NT
     {
         // [General]
         bool enabled = true;  // false: Vanilla HUD shows the notifications again
+        bool verboseLog = false;  // INI only: log every notification and merge (debug level)
 
         // [Layout] PosX/PosY are fractions of the screen and mark the anchor
         // of the block: its top edge, and depending on Align its left edge,

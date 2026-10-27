@@ -41,8 +41,13 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   thoughts read from `Data/SKSE/Plugins/ypsThoughts/*.json` at
   kDataLoaded (2713 with the German override; the `[nnnnn]` sound prefix
   is stripped), or when it is plain text whose first half ends
-  mid-sentence (the ~500 ticker narration lines carry actor names and are
-  in no database).
+  mid-sentence and whose second half starts lowercase (the ~500 ticker
+  narration lines carry actor names and are in no database). Without the
+  lowercase check, load-time bursts merged wrongly in game ("Zuschauer-
+  Vertreiber - Ziel hinzugefügt" + "... - Bereich hinzugefügt").
+- The engine already drops a `Debug.Notification` whose text repeats an
+  earlier one (four identical sends reached the hook once), so stacking
+  "(x2)" mainly matters for other senders.
 - **BoS**: Bimbos of Skyrim 1.9.1.2 never splits text itself (every
   compiled script in the instance was searched); each thought is one
   `Debug.Notification("<font color=\"#FF00FF\">...</font>")`. The rule

@@ -8,11 +8,20 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$vcvars = 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat'
-if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found: $vcvars" }
-if (-not $env:VCPKG_ROOT) { $env:VCPKG_ROOT = 'E:\vcpkg' }
+# Newest Visual Studio with the C++ x64 tools, found through vswhere.
 $installer = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer'
-if (Test-Path $installer) { $env:PATH = "$installer;$env:PATH" }
+$vswhere = Join-Path $installer 'vswhere.exe'
+if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found: install Visual Studio with the C++ workload' }
+$vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+if (-not $vsPath) { throw 'No Visual Studio installation with the C++ x64 tools found' }
+$vcvars = Join-Path $vsPath 'VC\Auxiliary\Build\vcvars64.bat'
+if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found: $vcvars" }
+# vcvars itself calls vswhere, which is not on PATH in a PowerShell-spawned cmd.
+$env:PATH = "$installer;$env:PATH"
+if (-not $env:VCPKG_ROOT) {
+    if (Test-Path 'E:\vcpkg\scripts\buildsystems\vcpkg.cmake') { $env:VCPKG_ROOT = 'E:\vcpkg' }
+    else { throw 'Set VCPKG_ROOT to your vcpkg checkout' }
+}
 
 New-Item -ItemType Directory -Force -Path (Join-Path $root 'build') | Out-Null
 $log = Join-Path $root 'build\build-log.txt'

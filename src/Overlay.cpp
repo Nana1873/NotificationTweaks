@@ -229,7 +229,11 @@ namespace
         }
         auto&      s = NT::Config();
         const bool positioning = g_positioning.load();
-        if (!positioning && (!s.enabled || !HudVisible(ui))) {
+        if (!s.enabled && !positioning) {
+            NT::Capture::ClearActive();  // no stale lines when it is switched back on
+            return;
+        }
+        if (!positioning && !HudVisible(ui)) {
             return;
         }
         // While the framework's own menu is open the lines stay visible as a

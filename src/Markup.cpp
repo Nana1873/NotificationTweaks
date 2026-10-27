@@ -123,9 +123,11 @@ namespace NT::Markup
         Run                                        current;
 
         const auto flush = [&]() {
-            if (!current.text.empty()) {
-                runs.push_back(std::move(current));
+            if (current.text.empty()) {
+                current.rgb = colors.back();  // keep a pending lineBreak
+                return;
             }
+            runs.push_back(std::move(current));
             current = Run{};
             current.rgb = colors.back();
         };

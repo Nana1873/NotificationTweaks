@@ -1,0 +1,34 @@
+Notification Tweaks is licensed under the GNU General Public License v3.0
+(see NotificationTweaks-LICENSE.txt). Source code:
+https://github.com/Nana1873/NotificationTweaks
+
+NotificationTweaks.dll contains code from the following projects:
+
+CommonLibSSE-NG (alandtse/CommonLibVR, branch ng)
+  https://github.com/alandtse/CommonLibVR
+  GPL-3.0-or-later with the project's Modding Exception and GPL-3.0 Linking
+  Exception (see EXCEPTIONS.md in that repository). Earlier portions were
+  released under the MIT License.
+
+SKSE Menu Framework consumer header (SKSEMenuFramework.h)
+  https://www.nexusmods.com/skyrimspecialedition/mods/120352
+  MIT License, Copyright (c) 2024 Thiago Kaique
+
+spdlog
+  https://github.com/gabime/spdlog
+  MIT License, Copyright (c) 2016 Gabi Melman
+
+{fmt}
+  https://github.com/fmtlib/fmt
+  MIT License, Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors
+
+DirectXTK and DirectXMath (linked through CommonLibSSE-NG)
+  https://github.com/microsoft/DirectXTK
+  https://github.com/microsoft/DirectXMath
+  MIT License, Copyright (c) Microsoft Corporation
+
+rapidcsv (header used by CommonLibSSE-NG)
+  https://github.com/d99kris/rapidcsv
+  BSD 3-Clause License, Copyright (c) 2017, Kristofer Berggren
+
+The full license texts are available at the project pages above.

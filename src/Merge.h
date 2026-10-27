@@ -19,8 +19,9 @@ namespace NT::Merge
     // max(30, len / 2 - 3). True when a + " " + b is longer than a_limit
     // (YPS's LongThoughtLimit), splits exactly into a/b and either is one of
     // the thoughts in YPS's databases (see LoadYpsThoughts) or is plain text
-    // whose first half ends mid-sentence (YpsPiercingTicker narration). The
-    // split formula alone also fits many unrelated pairs of similar length.
+    // whose first half ends mid-sentence and whose second half starts
+    // lowercase (YpsPiercingTicker narration). The split formula alone also
+    // fits many unrelated pairs of similar length.
     bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit);
 
     // Reads every string from Data/SKSE/Plugins/ypsThoughts/*.json (YPS and

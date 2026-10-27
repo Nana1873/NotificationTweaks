@@ -78,7 +78,6 @@ STRINGS = [
     ("testYpsText", "I love how my shoulder-length hair lets me switch effortlessly between casual and elegant hairstyles.", "Ich liebe, wie ich mit schulterlangen Haaren mühelos zwischen lässigen und eleganten Frisuren wechseln kann."),
     ("testBosFirst", "I can't stop thinking about", "Ich muss ständig daran denken,"),
     ("testBosSecond", "how pretty my nails look...", "wie hübsch meine Nägel aussehen..."),
-    ("waiting", "Waiting for game data to load...", "Warte auf das Laden der Spieldaten..."),
 ]
 
 
@@ -100,7 +99,7 @@ header = [
     "{",
     "    // Parses Interface/Translations/<a_name>_<sLanguage>.txt (ENGLISH as",
     "    // fallback) into the plugin's own table; the engine's translation table",
-    "    // is never written (startup crash in Quick Audio Sliders). Game thread,",
+    "    // is never written (writing it during startup can crash). Game thread,",
     "    // kDataLoaded.",
     "    void Import(std::string_view a_name);",
     "",

@@ -28,7 +28,7 @@ namespace
         float      value = a_default;
         if (!text.empty()) {
             const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (ec != std::errc{}) {
+            if (ec != std::errc{} || !std::isfinite(value)) {
                 value = a_default;
             }
         }
@@ -78,6 +78,7 @@ namespace NT
         auto&      s = g_settings;
 
         s.enabled = ReadBool("General", "Enabled", d.enabled, path);
+        s.verboseLog = ReadBool("General", "VerboseLog", d.verboseLog, path);
 
         s.posX = ReadFloat("Layout", "PosX", d.posX, 0.0F, 1.0F, path);
         s.posY = ReadFloat("Layout", "PosY", d.posY, 0.0F, 1.0F, path);
@@ -123,6 +124,7 @@ namespace NT
         std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
 
         Write("General", "Enabled", b(s.enabled), path);
+        Write("General", "VerboseLog", b(s.verboseLog), path);
 
         Write("Layout", "PosX", f(s.posX), path);
         Write("Layout", "PosY", f(s.posY), path);

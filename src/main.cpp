@@ -46,6 +46,10 @@ namespace
             return;
         }
         NT::LoadSettings();
+        if (NT::Config().verboseLog) {
+            spdlog::set_level(spdlog::level::debug);
+            spdlog::flush_on(spdlog::level::debug);
+        }
         NT::Merge::LoadYpsThoughts();
         // Data/Interface/Translations/NotificationTweaks_<LANGUAGE>.txt
         // (English defaults are compiled in; German ships alongside).

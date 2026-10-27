@@ -28,6 +28,16 @@ namespace
         }
     }
 
+    // Exactly four hex digits.
+    bool Hex4(std::string_view a_digits, std::uint32_t& a_out)
+    {
+        if (a_digits.size() != 4) {
+            return false;
+        }
+        const auto [ptr, ec] = std::from_chars(a_digits.data(), a_digits.data() + 4, a_out, 16);
+        return ec == std::errc{} && ptr == a_digits.data() + 4;
+    }
+
     // Every JSON string literal in a_json (keys included; they are short and
     // harmless). Bytes outside escapes are kept as they are, like JsonUtil does.
     void CollectStrings(std::string_view a_json, std::unordered_set<std::string>& a_out)
@@ -59,16 +69,17 @@ namespace
                 case 'u':
                     {
                         std::uint32_t code = 0;
-                        if (i + 4 < a_json.size() && std::from_chars(a_json.data() + i + 1, a_json.data() + i + 5, code, 16).ec == std::errc{}) {
+                        if (i + 4 < a_json.size() && Hex4(a_json.substr(i + 1, 4), code)) {
                             i += 4;
-                            if (code >= 0xD800 && code < 0xDC00 && i + 6 < a_json.size() && a_json[i + 1] == '\\' && a_json[i + 2] == 'u') {
-                                std::uint32_t low = 0;
-                                if (std::from_chars(a_json.data() + i + 3, a_json.data() + i + 7, low, 16).ec == std::errc{}) {
-                                    code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
-                                    i += 6;
-                                }
+                            std::uint32_t low = 0;
+                            if (code >= 0xD800 && code < 0xDC00 && i + 6 < a_json.size() && a_json[i + 1] == '\\' && a_json[i + 2] == 'u' &&
+                                Hex4(a_json.substr(i + 3, 4), low) && low >= 0xDC00 && low < 0xE000) {
+                                code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+                                i += 6;
                             }
-                            AppendUtf8(code, value);
+                            if (code < 0xD800 || code >= 0xE000) {
+                                AppendUtf8(code, value);  // a lone surrogate is dropped
+                            }
                         }
                         break;
                     }
@@ -165,9 +176,10 @@ namespace NT::Merge
         }
         // YpsPiercingTicker.shownotification splits its ~500 narration lines
         // (with actor names, so in no database) the same way. Those carry no
-        // markup; a first half that ends a sentence is far more likely to be
-        // a separate message than a split, so it stays apart.
-        return full.find('<') == std::string::npos && !EndsSentence(a_first);
+        // markup and are cut mid-sentence. Load-time bursts of unrelated
+        // lines without punctuation ("X hinzugefügt", "Y Loaded") fit the
+        // formula too, so the second half must also start lowercase.
+        return full.find('<') == std::string::npos && !EndsSentence(a_first) && StartsLowercase(a_second);
     }
 
     void LoadYpsThoughts()

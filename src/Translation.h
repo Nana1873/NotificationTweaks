@@ -5,7 +5,7 @@ namespace NT::Translation
 {
     // Parses Interface/Translations/<a_name>_<sLanguage>.txt (ENGLISH as
     // fallback) into the plugin's own table; the engine's translation table
-    // is never written (startup crash in Quick Audio Sliders). Game thread,
+    // is never written (writing it during startup can crash). Game thread,
     // kDataLoaded.
     void Import(std::string_view a_name);
 
@@ -84,7 +84,6 @@ namespace NT::Translation
         std::string testYpsText = "I love how my shoulder-length hair lets me switch effortlessly between casual and elegant hairstyles.";
         std::string testBosFirst = "I can't stop thinking about";
         std::string testBosSecond = "how pretty my nails look...";
-        std::string waiting = "Waiting for game data to load...";
     };
 
     void           LoadStrings();
