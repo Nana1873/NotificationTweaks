@@ -33,11 +33,14 @@ namespace NT
         bool  newestOnTop = false;
         float maxWidth = 0.45F;  // fraction of the screen width; longer lines wrap
         int   maxVisible = 6;
+        bool  showInMenus = true;  // false: lines wait while a full-screen menu (inventory, map) is open
 
         // [Style]
         std::string font;  // ImGui font name from the SKSE Menu Framework atlas; empty = default
-        float       fontSize = 24.0F;
-        float       lineSpacing = 4.0F;
+        // Pixels at 1080p; the overlay scales both with the screen height so
+        // the defaults look the same at every resolution.
+        float       fontSize = 20.0F;
+        float       lineSpacing = 3.0F;
         float       textColor[4] = { 1.0F, 1.0F, 1.0F, 1.0F };
         TextEffect  effect = TextEffect::kShadow;
         float       backgroundAlpha = 0.0F;

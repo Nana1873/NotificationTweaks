@@ -15,6 +15,12 @@ namespace NT::Translation
     {
         std::string pageDisplay = "Display";
         std::string pageCompat = "Compatibility";
+        std::string pageHistory = "History";
+        std::string historyHint = "The last 100 notifications of this session, newest first.";
+        std::string historyFilter = "Filter...";
+        std::string historyClear = "Clear";
+        std::string historyEmpty = "No notifications yet.";
+        std::string headAdvanced = "Advanced";
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";
         std::string headPosition = "Position";
@@ -27,12 +33,15 @@ namespace NT::Translation
         std::string alignCenter = "Center";
         std::string alignRight = "Right";
         std::string newestOnTop = "Newest line on top";
+        std::string showInMenus = "Show in menus";
+        std::string showInMenusTip = "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.";
         std::string maxWidth = "Max. line width";
         std::string maxVisible = "Max. visible messages";
         std::string headStyle = "Font and style";
         std::string font = "Font";
         std::string fontDefault = "Menu Framework default";
         std::string fontSize = "Font size";
+        std::string fontSizeTip = "Size at 1080p; other resolutions scale with the screen height.";
         std::string lineSpacing = "Line spacing";
         std::string textColor = "Text color";
         std::string effect = "Text effect";

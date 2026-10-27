@@ -141,6 +141,18 @@ namespace
         return ImGuiMCP::ColorConvertFloat4ToU32(color);
     }
 
+    // Full-screen menus the lines would be drawn over. Checked by name, not
+    // by GameIsPaused: Skyrim Souls and similar mods keep these unpaused.
+    bool FullScreenMenuOpen(RE::UI* a_ui)
+    {
+        static constexpr std::string_view kMenus[] = { RE::InventoryMenu::MENU_NAME, RE::MagicMenu::MENU_NAME,
+            RE::MapMenu::MENU_NAME, RE::StatsMenu::MENU_NAME, RE::ContainerMenu::MENU_NAME, RE::BarterMenu::MENU_NAME,
+            RE::GiftMenu::MENU_NAME, RE::JournalMenu::MENU_NAME, RE::TweenMenu::MENU_NAME, RE::CraftingMenu::MENU_NAME,
+            RE::LockpickingMenu::MENU_NAME, RE::BookMenu::MENU_NAME, RE::SleepWaitMenu::MENU_NAME, RE::TrainingMenu::MENU_NAME,
+            RE::LevelUpMenu::MENU_NAME, RE::Console::MENU_NAME, RE::RaceSexMenu::MENU_NAME };
+        return std::ranges::any_of(kMenus, [&](std::string_view a_name) { return a_ui->IsMenuOpen(a_name); });
+    }
+
     bool HudVisible(RE::UI* a_ui)
     {
         if (a_ui->IsMenuOpen(RE::MainMenu::MENU_NAME) || a_ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME)) {
@@ -220,13 +232,19 @@ namespace
         if (!positioning && (!s.enabled || !HudVisible(ui))) {
             return;
         }
+        // While the framework's own menu is open the lines stay visible as a
+        // preview for the settings.
+        if (!positioning && !s.showInMenus && FullScreenMenuOpen(ui) && !SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
+            return;  // lines wait (and do not age) until the menu closes
+        }
 
         const float dt = ui->GameIsPaused() && !positioning ? 0.0F : io->DeltaTime;
         auto        entries = Tick(dt, s);
 
         const auto screen = io->DisplaySize;
         auto*      font = ResolveFont();
-        const float size = s.fontSize;
+        const float scale = screen.y > 0.0F ? screen.y / 1080.0F : 1.0F;
+        const float size = s.fontSize * scale;
         const float maxWidth = std::max(50.0F, s.maxWidth * screen.x);
 
         struct Block
@@ -249,7 +267,7 @@ namespace
             std::ranges::reverse(blocks);
         }
 
-        const float lineHeight = size + s.lineSpacing;
+        const float lineHeight = size + s.lineSpacing * scale;
         float       blockWidth = 0.0F;
         float       blockHeight = 0.0F;
         for (const auto& block : blocks) {

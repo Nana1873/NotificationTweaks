@@ -5,6 +5,7 @@
 #include "Overlay.h"
 #include "SKSEMenuFramework.h"
 #include "Settings.h"
+#include "StringConv.h"
 #include "Translation.h"
 
 namespace
@@ -176,24 +177,17 @@ namespace
             OpenPositioning();
         }
         Tooltip(t.dragTip);
-        PercentSlider(t.posX, "##posx", s.posX, 0.0F, 1.0F);
-        PercentSlider(t.posY, "##posy", s.posY, 0.0F, 1.0F);
         int align = static_cast<int>(s.align);
         if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
             s.align = static_cast<NT::Align>(align);
             NT::SaveSettings();
         }
-        Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
-        PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, 0.1F, 1.0F);
-        ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, 1, 20);
-        Commit();
 
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
-        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, 8.0F, 96.0F, "%.0f px");
+        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, 8.0F, 72.0F, "%.0f px");
         Commit();
-        ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, 0.0F, 40.0F, "%.0f px");
-        Commit();
+        Tooltip(t.fontSizeTip);
         ImGuiMCP::ColorEdit4((t.textColor + "##color").c_str(), s.textColor);
         Commit();
         int effect = static_cast<int>(s.effect);
@@ -201,7 +195,6 @@ namespace
             s.effect = static_cast<NT::TextEffect>(effect);
             NT::SaveSettings();
         }
-        PercentSlider(t.background, "##background", s.backgroundAlpha, 0.0F, 1.0F);
 
         ImGuiMCP::SeparatorText(t.headTiming.c_str());
         Commit(ImGuiMCP::Checkbox((t.immediate + "##immediate").c_str(), &s.immediate));
@@ -210,9 +203,26 @@ namespace
             SecondsSlider(t.queueDelay, "##queuedelay", s.queueDelay, 0.1F, 5.0F);
         }
         SecondsSlider(t.duration, "##duration", s.duration, 0.5F, 30.0F);
-        SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, 0.0F, 3.0F);
-        SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, 0.0F, 5.0F);
         Commit(ImGuiMCP::Checkbox((t.stack + "##stack").c_str(), &s.stackDuplicates));
+
+        // Values most players set once or never.
+        ImGuiMCP::Spacing();
+        if (ImGuiMCP::CollapsingHeader((t.headAdvanced + "##advanced").c_str())) {
+            PercentSlider(t.posX, "##posx", s.posX, 0.0F, 1.0F);
+            PercentSlider(t.posY, "##posy", s.posY, 0.0F, 1.0F);
+            Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
+            Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
+            Tooltip(t.showInMenusTip);
+            PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, 0.1F, 1.0F);
+            ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, 1, 20);
+            Commit();
+            ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, 0.0F, 30.0F, "%.0f px");
+            Commit();
+            PercentSlider(t.background, "##background", s.backgroundAlpha, 0.0F, 1.0F);
+            SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, 0.0F, 3.0F);
+            SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, 0.0F, 5.0F);
+            RenderResetDisplay();
+        }
 
         ImGuiMCP::SeparatorText(t.headTest.c_str());
         if (ImGuiMCP::Button((t.test1 + "##test1").c_str())) {
@@ -226,8 +236,6 @@ namespace
             }
             NT::Capture::SendTest(std::move(texts));
         }
-        ImGuiMCP::SameLine();
-        RenderResetDisplay();
 
         ImGuiMCP::Spacing();
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
@@ -275,6 +283,69 @@ namespace
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
     }
 
+    std::wstring Lowercase(std::string_view a_utf8)
+    {
+        auto wide = NT::Text::ToWide(a_utf8);
+        if (!wide.empty()) {
+            CharLowerBuffW(wide.data(), static_cast<DWORD>(wide.size()));
+        }
+        return wide;
+    }
+
+    std::string LocalTime(std::chrono::system_clock::time_point a_time)
+    {
+        const auto seconds = std::chrono::system_clock::to_time_t(a_time);
+        std::tm    local{};
+        localtime_s(&local, &seconds);
+        return std::format("{:02}:{:02}:{:02}", local.tm_hour, local.tm_min, local.tm_sec);
+    }
+
+    // Page "History": the session's notifications, newest first, in their
+    // own color; merged halves appear as the one line they became.
+    void __stdcall RenderHistory()
+    {
+        const auto& t = NT::Translation::S();
+        static char filter[128]{};
+
+        ImGuiMCP::TextDisabled("%s", t.historyHint.c_str());
+        ImGuiMCP::InputTextWithHint("##historyfilter", t.historyFilter.c_str(), filter, sizeof(filter));
+        ImGuiMCP::SameLine();
+        if (ImGuiMCP::Button((t.historyClear + "##historyclear").c_str())) {
+            NT::Capture::ClearHistory();
+        }
+        ImGuiMCP::Separator();
+
+        const auto needle = Lowercase(filter);
+        if (ImGuiMCP::BeginChild("##historylist", { 0.0F, 0.0F })) {
+            bool any = false;
+            NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) {
+                for (auto it = a_history.rbegin(); it != a_history.rend(); ++it) {
+                    if (!needle.empty() && Lowercase(it->text).find(needle) == std::wstring::npos) {
+                        continue;
+                    }
+                    any = true;
+                    ImGuiMCP::TextDisabled("%s", LocalTime(it->time).c_str());
+                    ImGuiMCP::SameLine();
+                    const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
+                    if (it->rgb) {
+                        const auto rgb = *it->rgb;
+                        ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text,
+                            { static_cast<float>((rgb >> 16) & 0xFF) / 255.0F, static_cast<float>((rgb >> 8) & 0xFF) / 255.0F,
+                                static_cast<float>(rgb & 0xFF) / 255.0F, 1.0F });
+                    }
+                    ImGuiMCP::TextWrapped("%s", line.c_str());
+                    if (it->rgb) {
+                        ImGuiMCP::PopStyleColor();
+                    }
+                }
+            });
+            if (!any) {
+                ImGuiMCP::TextDisabled("%s", t.historyEmpty.c_str());
+            }
+        }
+        ImGuiMCP::EndChild();
+    }
+
     // Leaving the menu ends positioning even when the window was not closed
     // through Done.
     void __stdcall OnMenuEvent(SKSEMenuFramework::Model::EventType a_type)
@@ -294,9 +365,10 @@ namespace NT::MenuIntegration
         SKSEMenuFramework::SetSection(kSectionName);
         SKSEMenuFramework::AddSectionItem(t.pageDisplay, RenderDisplay);
         SKSEMenuFramework::AddSectionItem(t.pageCompat, RenderCompat);
+        SKSEMenuFramework::AddSectionItem(t.pageHistory, RenderHistory);
         g_positionWindow = SKSEMenuFramework::AddWindow(RenderPositionWindow, true);
         SKSEMenuFramework::AddEvent(OnMenuEvent, 0.0F);
-        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}'", kSectionName,
-            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageCompat);
+        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}', '{}'", kSectionName,
+            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageCompat, t.pageHistory);
     }
 }

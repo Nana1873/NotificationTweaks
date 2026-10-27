@@ -85,10 +85,12 @@ namespace NT
         s.newestOnTop = ReadBool("Layout", "NewestOnTop", d.newestOnTop, path);
         s.maxWidth = ReadFloat("Layout", "MaxWidth", d.maxWidth, 0.1F, 1.0F, path);
         s.maxVisible = ReadInt("Layout", "MaxVisible", d.maxVisible, 1, 20, path);
+        s.showInMenus = ReadBool("Layout", "ShowInMenus", d.showInMenus, path);
 
         s.font = ReadString("Style", "Font", d.font, path);
-        s.fontSize = ReadFloat("Style", "FontSize", d.fontSize, 8.0F, 96.0F, path);
-        s.lineSpacing = ReadFloat("Style", "LineSpacing", d.lineSpacing, 0.0F, 40.0F, path);
+        // "...1080" keys: older test builds stored absolute pixels as FontSize.
+        s.fontSize = ReadFloat("Style", "FontSize1080", d.fontSize, 8.0F, 72.0F, path);
+        s.lineSpacing = ReadFloat("Style", "LineSpacing1080", d.lineSpacing, 0.0F, 30.0F, path);
         ReadColor("Style", "TextColor", s.textColor, path);
         s.effect = static_cast<TextEffect>(ReadInt("Style", "Effect", static_cast<int>(d.effect), 0, 2, path));
         s.backgroundAlpha = ReadFloat("Style", "BackgroundAlpha", d.backgroundAlpha, 0.0F, 1.0F, path);
@@ -128,14 +130,17 @@ namespace NT
         Write("Layout", "NewestOnTop", b(s.newestOnTop), path);
         Write("Layout", "MaxWidth", f(s.maxWidth), path);
         Write("Layout", "MaxVisible", std::to_string(s.maxVisible), path);
+        Write("Layout", "ShowInMenus", b(s.showInMenus), path);
 
         std::uint32_t rgba = 0;
         for (int i = 0; i < 4; ++i) {
             rgba |= static_cast<std::uint32_t>(std::lround(std::clamp(s.textColor[i], 0.0F, 1.0F) * 255.0F)) << (24 - 8 * i);
         }
         Write("Style", "Font", s.font, path);
-        Write("Style", "FontSize", f(s.fontSize), path);
-        Write("Style", "LineSpacing", f(s.lineSpacing), path);
+        Write("Style", "FontSize1080", f(s.fontSize), path);
+        Write("Style", "LineSpacing1080", f(s.lineSpacing), path);
+        WritePrivateProfileStringA("Style", "FontSize", nullptr, path.c_str());
+        WritePrivateProfileStringA("Style", "LineSpacing", nullptr, path.c_str());
         Write("Style", "TextColor", std::format("{:08X}", rgba), path);
         Write("Style", "Effect", std::to_string(static_cast<int>(s.effect)), path);
         Write("Style", "BackgroundAlpha", f(s.backgroundAlpha), path);

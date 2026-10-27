@@ -185,6 +185,12 @@ namespace NT::Translation
         Strings defaults;
         g_strings.pageDisplay = Translate("$NT_PageDisplay", defaults.pageDisplay);
         g_strings.pageCompat = Translate("$NT_PageCompat", defaults.pageCompat);
+        g_strings.pageHistory = Translate("$NT_PageHistory", defaults.pageHistory);
+        g_strings.historyHint = Translate("$NT_HistoryHint", defaults.historyHint);
+        g_strings.historyFilter = Translate("$NT_HistoryFilter", defaults.historyFilter);
+        g_strings.historyClear = Translate("$NT_HistoryClear", defaults.historyClear);
+        g_strings.historyEmpty = Translate("$NT_HistoryEmpty", defaults.historyEmpty);
+        g_strings.headAdvanced = Translate("$NT_HeadAdvanced", defaults.headAdvanced);
         g_strings.enabled = Translate("$NT_Enabled", defaults.enabled);
         g_strings.enabledTip = Translate("$NT_EnabledTip", defaults.enabledTip);
         g_strings.headPosition = Translate("$NT_HeadPosition", defaults.headPosition);
@@ -197,12 +203,15 @@ namespace NT::Translation
         g_strings.alignCenter = Translate("$NT_AlignCenter", defaults.alignCenter);
         g_strings.alignRight = Translate("$NT_AlignRight", defaults.alignRight);
         g_strings.newestOnTop = Translate("$NT_NewestOnTop", defaults.newestOnTop);
+        g_strings.showInMenus = Translate("$NT_ShowInMenus", defaults.showInMenus);
+        g_strings.showInMenusTip = Translate("$NT_ShowInMenusTip", defaults.showInMenusTip);
         g_strings.maxWidth = Translate("$NT_MaxWidth", defaults.maxWidth);
         g_strings.maxVisible = Translate("$NT_MaxVisible", defaults.maxVisible);
         g_strings.headStyle = Translate("$NT_HeadStyle", defaults.headStyle);
         g_strings.font = Translate("$NT_Font", defaults.font);
         g_strings.fontDefault = Translate("$NT_FontDefault", defaults.fontDefault);
         g_strings.fontSize = Translate("$NT_FontSize", defaults.fontSize);
+        g_strings.fontSizeTip = Translate("$NT_FontSizeTip", defaults.fontSizeTip);
         g_strings.lineSpacing = Translate("$NT_LineSpacing", defaults.lineSpacing);
         g_strings.textColor = Translate("$NT_TextColor", defaults.textColor);
         g_strings.effect = Translate("$NT_Effect", defaults.effect);

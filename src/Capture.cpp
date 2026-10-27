@@ -5,9 +5,48 @@
 
 namespace
 {
-    std::mutex                    g_lock;
-    std::deque<NT::Capture::Entry> g_entries;
-    std::uint64_t                 g_nextID = 1;
+    std::mutex                            g_lock;
+    std::deque<NT::Capture::Entry>        g_entries;
+    std::deque<NT::Capture::HistoryEntry> g_history;
+    std::uint64_t                         g_nextID = 1;
+
+    // Caller holds g_lock.
+    void SetHistoryText(NT::Capture::HistoryEntry& a_entry, std::string_view a_raw)
+    {
+        a_entry.text = NT::Markup::Visible(a_raw);
+        a_entry.rgb = NT::Markup::WrappingColor(a_raw);
+    }
+
+    // Caller holds g_lock.
+    void AddHistory(std::uint64_t a_id, std::string_view a_raw)
+    {
+        NT::Capture::HistoryEntry entry;
+        entry.id = a_id;
+        entry.time = std::chrono::system_clock::now();
+        SetHistoryText(entry, a_raw);
+        g_history.push_back(std::move(entry));
+        while (g_history.size() > NT::Capture::kHistorySize) {
+            g_history.pop_front();
+        }
+    }
+
+    // Caller holds g_lock.
+    NT::Capture::HistoryEntry* FindHistory(std::uint64_t a_id)
+    {
+        for (auto it = g_history.rbegin(); it != g_history.rend(); ++it) {
+            if (it->id == a_id) {
+                return &*it;
+            }
+        }
+        return nullptr;
+    }
+
+    // Vanilla display (plugin switched off): the history still records.
+    void RecordOnly(std::string_view a_raw)
+    {
+        std::scoped_lock lock{ g_lock };
+        AddHistory(g_nextID++, a_raw);
+    }
 
     const char* RuleName(NT::Merge::Rule a_rule)
     {
@@ -45,10 +84,16 @@ namespace
     {
         static RE::UI_MESSAGE_RESULTS thunk(RE::IMenu* a_this, RE::UIMessage& a_message)
         {
-            if (NT::Config().enabled && a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
+            if (a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
                     data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
                     const char* text = data->text.c_str();
+                    if (!NT::Config().enabled) {
+                        if (text && *text) {
+                            RecordOnly(text);
+                        }
+                        return func(a_this, a_message);
+                    }
                     if (text && *text) {
                         NT::Capture::Push(text);
                     }
@@ -127,6 +172,9 @@ namespace NT::Capture
                     last.raw = Merge::Join(last.raw, raw);
                     last.runs = Markup::Parse(last.raw);
                     last.mergedBy = rule;
+                    if (auto* history = FindHistory(last.id)) {
+                        SetHistoryText(*history, last.raw);
+                    }
                     logs::info("Merged ({}, {:.0f} ms): {}", RuleName(rule), gap * 1000.0F, Markup::ToUtf8(last.raw));
                     return;
                 }
@@ -138,6 +186,10 @@ namespace NT::Capture
                 if (entry.raw == raw && entry.age < s.fadeIn + s.duration) {
                     ++entry.count;
                     entry.age = std::min(entry.age, s.fadeIn);
+                    if (auto* history = FindHistory(entry.id)) {
+                        history->count = entry.count;
+                        history->time = std::chrono::system_clock::now();
+                    }
                     return;
                 }
             }
@@ -149,6 +201,7 @@ namespace NT::Capture
         entry.runs = Markup::Parse(entry.raw);
         entry.arrival = now;
         logs::info("Notification #{}: {}", entry.id, Markup::ToUtf8(entry.raw));
+        AddHistory(entry.id, entry.raw);
         g_entries.push_back(std::move(entry));
 
         // Keep memory bounded when the HUD is hidden for a long time.
@@ -161,6 +214,18 @@ namespace NT::Capture
     {
         std::scoped_lock lock{ g_lock };
         a_visitor(g_entries);
+    }
+
+    void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor)
+    {
+        std::scoped_lock lock{ g_lock };
+        a_visitor(g_history);
+    }
+
+    void ClearHistory()
+    {
+        std::scoped_lock lock{ g_lock };
+        g_history.clear();
     }
 
     void SendTest(std::vector<std::string> a_texts)
