@@ -14,15 +14,14 @@ plugins put in the top left corner) and draws them itself through
 - **Style:** font from the Menu Framework, size (relative to 1080p, so it
   looks the same at any resolution), color, shadow or outline, optional
   background, display time and fades.
-- **Merges split messages:** YPS Immersive Fashion splits long thoughts and
-  narration into two notifications; they are shown as one line again, in
-  the right order, in any language. Also a rule for Bimbos of Skyrim
-  thoughts and an optional generic rule.
 - **History:** the last 100 notifications of the session with time of day,
   colors and a filter, on its own menu page.
 - **Waits for menus:** lines that arrive while the inventory, map or another
   full-screen menu is open appear when it closes (optional). Lines sent
   right before a loading screen show up after it.
+- Compatibility page: merges messages that some mods split into two
+  notifications (YPS Immersive Fashion, Bimbos of Skyrim, optional generic
+  rule).
 - Identical repeats stack as "(x2)". `$Key` notifications are translated
   like Vanilla does. Quest, skill and level messages stay Vanilla.
 - Save-neutral: nothing is written to the save. Settings live in
