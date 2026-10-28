@@ -21,7 +21,7 @@ namespace
         auto       pos = lower.find(a_name);
         while (pos != std::string::npos) {
             // Whole attribute names only ("color", not the tail of "bgcolor").
-            if (pos > 0 && lower[pos - 1] != ' ') {
+            if (pos > 0 && !std::isspace(static_cast<unsigned char>(lower[pos - 1]))) {
                 pos = lower.find(a_name, pos + 1);
                 continue;
             }
