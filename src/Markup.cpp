@@ -20,6 +20,11 @@ namespace
         const auto lower = Lower(a_tag);
         auto       pos = lower.find(a_name);
         while (pos != std::string::npos) {
+            // Whole attribute names only ("color", not the tail of "bgcolor").
+            if (pos > 0 && lower[pos - 1] != ' ') {
+                pos = lower.find(a_name, pos + 1);
+                continue;
+            }
             auto i = pos + a_name.size();
             while (i < lower.size() && lower[i] == ' ') {
                 ++i;

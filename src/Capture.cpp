@@ -41,11 +41,23 @@ namespace
         return nullptr;
     }
 
+    // The Vanilla text field translates a lone "$Key" through the Scaleform
+    // translator; keep that (unknown keys stay as sent). Empty when a_raw is
+    // no key.
+    std::string TranslateKey(std::string_view a_raw)
+    {
+        if (a_raw.size() > 1 && a_raw.front() == '$' && a_raw.find(' ') == std::string_view::npos) {
+            return NT::Translation::Translate(a_raw, a_raw);
+        }
+        return {};
+    }
+
     // Vanilla display (plugin switched off): the history still records.
     void RecordOnly(std::string_view a_raw)
     {
+        const auto translated = TranslateKey(a_raw);
         std::scoped_lock lock{ g_lock };
-        AddHistory(g_nextID++, a_raw);
+        AddHistory(g_nextID++, translated.empty() ? a_raw : std::string_view{ translated });
     }
 
     const char* RuleName(NT::Merge::Rule a_rule)
@@ -91,7 +103,7 @@ namespace
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
                     data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
                     const char* text = data->text.c_str();
-                    if (!NT::CaptureConfig().enabled) {
+                    if (!NT::CaptureEnabled()) {
                         if (text && *text) {
                             RecordOnly(text);
                         }
@@ -115,7 +127,7 @@ namespace
     {
         static void thunk(RE::HUDNotifications* a_this)
         {
-            if (a_this && NT::CaptureConfig().enabled) {
+            if (a_this && NT::CaptureEnabled()) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
                     if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word) {
@@ -159,12 +171,7 @@ namespace NT::Capture
 
     void Push(std::string_view a_raw)
     {
-        // The Vanilla text field translates a lone "$Key" through the
-        // Scaleform translator; keep that (unknown keys stay as sent).
-        std::string translated;
-        if (a_raw.size() > 1 && a_raw.front() == '$' && a_raw.find(' ') == std::string_view::npos) {
-            translated = Translation::Translate(a_raw, a_raw);
-        }
+        const auto             translated = TranslateKey(a_raw);
         const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
 
         const auto s = CaptureConfig();

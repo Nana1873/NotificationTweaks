@@ -248,15 +248,11 @@ namespace
     // Splits a_text exactly like ypsThoughts.psc does, for the test button.
     std::vector<std::string> YpsSplit(const std::string& a_text)
     {
-        const auto length = static_cast<std::ptrdiff_t>(a_text.size());
-        auto       split = std::max<std::ptrdiff_t>(30, length / 2 - 3);
-        while (split < length && a_text[static_cast<std::size_t>(split)] != ' ') {
-            ++split;
-        }
-        if (split >= length) {
+        const auto split = NT::Merge::YpsSplitPos(a_text);
+        if (split >= a_text.size()) {
             return { a_text };
         }
-        return { a_text.substr(0, static_cast<std::size_t>(split)), a_text.substr(static_cast<std::size_t>(split) + 1) };
+        return { a_text.substr(0, split), a_text.substr(split + 1) };
     }
 
     void __stdcall RenderCompat()

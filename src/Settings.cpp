@@ -10,6 +10,7 @@ namespace
 
     std::mutex          g_captureLock;
     NT::CaptureSettings g_capture;
+    std::atomic<bool>   g_captureEnabled{ true };
 
     void PublishCapture()
     {
@@ -26,6 +27,7 @@ namespace
         c.ypsLimit = s.ypsLimit;
         std::scoped_lock lock{ g_captureLock };
         g_capture = c;
+        g_captureEnabled = c.enabled;
     }
 
     std::string IniPath()
@@ -48,7 +50,7 @@ namespace
         float      value = a_default;
         if (!text.empty()) {
             const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (ec != std::errc{} || !std::isfinite(value)) {
+            if (ec != std::errc{} || ptr != text.data() + text.size() || !std::isfinite(value)) {
                 value = a_default;
             }
         }
@@ -70,7 +72,10 @@ namespace
     {
         const auto text = ReadString(a_section, a_key, "", a_path);
         std::uint32_t rgba = 0;
-        if (text.size() != 8 || std::from_chars(text.data(), text.data() + 8, rgba, 16).ec != std::errc{}) {
+        if (text.size() != 8) {
+            return;
+        }
+        if (const auto [ptr, ec] = std::from_chars(text.data(), text.data() + 8, rgba, 16); ec != std::errc{} || ptr != text.data() + 8) {
             return;
         }
         for (int i = 0; i < 4; ++i) {
@@ -109,7 +114,8 @@ namespace NT
         s.showInMenus = ReadBool("Layout", "ShowInMenus", d.showInMenus, path);
 
         s.font = ReadString("Style", "Font", d.font, path);
-        // "...1080" keys: older test builds stored absolute pixels as FontSize.
+        // "...1080" keys: older test builds stored absolute pixels under
+        // FontSize/LineSpacing; those are not read, SaveSettings removes them.
         s.fontSize = ReadFloat("Style", "FontSize1080", d.fontSize, 8.0F, 72.0F, path);
         s.lineSpacing = ReadFloat("Style", "LineSpacing1080", d.lineSpacing, 0.0F, 30.0F, path);
         ReadColor("Style", "TextColor", s.textColor, path);
@@ -187,5 +193,10 @@ namespace NT
     {
         std::scoped_lock lock{ g_captureLock };
         return g_capture;
+    }
+
+    bool CaptureEnabled()
+    {
+        return g_captureEnabled;
     }
 }

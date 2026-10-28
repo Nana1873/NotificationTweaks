@@ -154,6 +154,15 @@ namespace
 
 namespace NT::Merge
 {
+    std::size_t YpsSplitPos(std::string_view a_text)
+    {
+        auto split = std::max<std::size_t>(30, a_text.size() / 2 > 3 ? a_text.size() / 2 - 3 : 0);
+        while (split < a_text.size() && a_text[split] != ' ') {
+            ++split;
+        }
+        return std::min(split, a_text.size());
+    }
+
     bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit)
     {
         if (a_first.size() < 30 || a_second.empty()) {
@@ -164,11 +173,7 @@ namespace NT::Merge
         if (length <= a_limit) {
             return false;  // YPS sends thoughts up to its limit unsplit
         }
-        auto split = std::max<std::ptrdiff_t>(30, length / 2 - 3);
-        while (split < length && full[static_cast<std::size_t>(split)] != ' ') {
-            ++split;
-        }
-        if (split != static_cast<std::ptrdiff_t>(a_first.size())) {
+        if (YpsSplitPos(full) != a_first.size()) {
             return false;
         }
         if (g_ypsThoughts.contains(full)) {

@@ -24,6 +24,10 @@ namespace NT::Merge
     // fits many unrelated pairs of similar length.
     bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit);
 
+    // Where ypsThoughts.psc cuts a_text: the first space at or after
+    // max(30, len / 2 - 3), or a_text.size() when there is none.
+    std::size_t YpsSplitPos(std::string_view a_text);
+
     // Reads every string from Data/SKSE/Plugins/ypsThoughts/*.json (YPS and
     // translation overrides through the MO2 VFS). kDataLoaded.
     void LoadYpsThoughts();

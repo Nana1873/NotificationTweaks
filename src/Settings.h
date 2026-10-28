@@ -86,4 +86,7 @@ namespace NT
 
     // Any thread: a copy of the capture values as last loaded or saved.
     CaptureSettings CaptureConfig();
+
+    // Any thread, lock-free: CaptureConfig().enabled, for the per-frame hooks.
+    bool CaptureEnabled();
 }
