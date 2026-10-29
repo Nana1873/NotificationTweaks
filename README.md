@@ -29,7 +29,10 @@ plugins put in the top left corner) and draws them itself through
 - Identical repeats stack as "(x2)". `$Key` notifications are translated
   like Vanilla does. Quest, skill and level messages stay Vanilla.
 - Save-neutral: nothing is written to the save. Settings live in
-  `Data/SKSE/Plugins/NotificationTweaks.ini`.
+  `Data/SKSE/Plugins/NotificationTweaks.ini`. Two keys exist only there:
+  `[General] VerboseLog=1` logs every notification and merge, and
+  `[Compatibility] YPSLimit` (default 80, 30 to 1000) must match YPS's own
+  thought limit if you changed it in its MCM.
 - English and German UI; more languages through
   `Interface/Translations/NotificationTweaks_<LANGUAGE>.txt`.
 
@@ -67,8 +70,9 @@ Needs Visual Studio with the C++ workload, CMake, Ninja and vcpkg
 `tools\deploy.ps1` is the author's helper that copies a build into an MO2
 mod folder (`-Instance`, `-ModName`).
 
-UI strings are edited in `tools/strings.py`; run `python tools/strings.py`
-to regenerate `src/Translation.h` and the translation files.
+UI strings are edited in `tools/strings.py`; run `python -I tools/strings.py`
+to regenerate `src/Translation.h`, the `LoadStrings()` body in
+`src/Translation.cpp` and the translation files.
 
 Log: `My Games\Skyrim Special Edition\SKSE\NotificationTweaks.log`.
 

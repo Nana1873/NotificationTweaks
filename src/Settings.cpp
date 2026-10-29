@@ -37,9 +37,13 @@ namespace
         return ec ? std::string(kIniRelative) : path.string();
     }
 
+    // ReadString's buffer; [Hidden] values must fit into it.
+    constexpr std::size_t kReadBuffer = 2048;
+    constexpr std::size_t kMaxHiddenValue = kReadBuffer - 48;  // headroom for the quotes
+
     std::string ReadString(const char* a_section, const char* a_key, const std::string& a_default, const std::string& a_path)
     {
-        char buf[2048]{};
+        char buf[kReadBuffer]{};
         GetPrivateProfileStringA(a_section, a_key, a_default.c_str(), buf, static_cast<DWORD>(std::size(buf)), a_path.c_str());
         return buf;
     }
@@ -87,9 +91,6 @@ namespace
     {
         WritePrivateProfileStringA(a_section, a_key, a_value.c_str(), a_path.c_str());
     }
-
-    // [Hidden] values stay inside ReadString's buffer (quotes included).
-    constexpr std::size_t kMaxHiddenValue = 2000;
 
     // The profile A-API converts through the system ANSI codepage, which
     // breaks UTF-8 on DBCS locales; "%XX" keeps [Hidden] values ASCII.
@@ -235,7 +236,7 @@ namespace NT
         return g_captureEnabled;
     }
 
-    std::vector<std::string> LoadHidden()
+    std::vector<std::string> ReadHiddenKeys()
     {
         const auto               path = IniPath();
         const int                count = ReadInt("Hidden", "Count", 0, 0, 10000, path);
@@ -249,13 +250,17 @@ namespace NT
         return keys;
     }
 
-    void SaveHidden(const std::vector<std::string>& a_keys)
+    void WriteHiddenKeys(const std::vector<std::string>& a_keys)
     {
         const auto path = IniPath();
         std::error_code ec;
         std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
-        WritePrivateProfileStringA("Hidden", nullptr, nullptr, path.c_str());
-        int count = 0;
+
+        // One section write (one file rewrite) instead of one per key; it
+        // also replaces the old section as a whole, so Count and the lines
+        // never get out of step.
+        std::string lines;
+        int         count = 0;
         for (const auto& key : a_keys) {
             const auto value = Escape(key);
             if (value.size() > kMaxHiddenValue) {
@@ -264,8 +269,13 @@ namespace NT
             }
             // Quoted: the profile API strips outer quotes on read, so leading
             // or trailing spaces and quotes inside the text survive.
-            Write("Hidden", std::format("Line{}", ++count).c_str(), "\"" + value + "\"", path);
+            lines += std::format("Line{}=\"{}\"", ++count, value);
+            lines += '\0';
         }
-        Write("Hidden", "Count", std::to_string(count), path);
+        auto section = std::format("Count={}", count);
+        section += '\0';
+        section += lines;
+        section += '\0';
+        WritePrivateProfileSectionA("Hidden", section.c_str(), path.c_str());
     }
 }

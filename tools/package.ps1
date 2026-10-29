@@ -33,7 +33,11 @@ Copy-Item (Join-Path $root 'config\THIRD-PARTY-NOTICES.txt') (Join-Path $stage '
 
 $archive = Join-Path $dist "NotificationTweaks-$version.zip"
 if (Test-Path $archive) { Remove-Item $archive -Force }
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $archive
+# tar.exe (bsdtar, part of Windows 10+) writes zip entries with "/" as the
+# spec requires; Compress-Archive in PowerShell 5.1 writes "\".
+$entries = Get-ChildItem $stage | ForEach-Object { $_.Name }
+& tar.exe -a -c -f $archive -C $stage @entries
+if ($LASTEXITCODE -ne 0) { throw "tar.exe failed with exit code $LASTEXITCODE" }
 Remove-Item $stage -Recurse -Force
 
 Write-Host "[package] OK: $archive"

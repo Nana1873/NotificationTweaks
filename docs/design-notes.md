@@ -75,8 +75,8 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   Condensed, extracted from the game's own font). Font size and line
   spacing are pixels at 1080p, scaled by screen height.
 - Hidden while the HUD movie is invisible, at the main menu and during
-  loading screens. `ShowInMenus` (default off) hides lines while a
-  full-screen menu is open; those menus are detected by name because
+  loading screens. With `ShowInMenus` off (default), lines wait while a
+  full-screen menu is open and appear when it closes; those menus are detected by name because
   Skyrim Souls RE keeps them unpaused, so `GameIsPaused()` is false there.
   Dialogue is not on the list: lines show during conversations.
 - Drag mode: an SMF window (`AddWindow`) with Done replaces the main
@@ -93,6 +93,24 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   compiled in; `tools/strings.py` generates `Translation.h`, the
   `LoadStrings()` body and both UTF-16 translation files.
 - History: last 100 lines with real time, memory only (save-neutral).
+
+## Hiding (1.1.0)
+
+- The eye on a History line hides by key: `Capture::HideKey` turns the
+  visible text (`Markup::Visible`) into a key with every ASCII digit run
+  replaced by `#`, so "25 Gold added" and "30 Gold added" share one key.
+- Keys live in `[Hidden]` as `Count` plus `Line1..N`, each value quoted
+  (the profile API strips outer quotes, keeping edge spaces) and
+  `%XX`-escaped for bytes >= 0x80, < 0x20 and `%` (the A-API goes through
+  the ANSI codepage, which breaks UTF-8 on DBCS locales). The section is
+  written in one `WritePrivateProfileSectionA` call outside `g_lock`.
+- Hidden lines stay in the live queue (so a second half can still merge)
+  but are not drawn, do not count for MaxVisible and never hold up queue
+  mode. A line that is shown again (eye, "show all" or a merge that changes
+  its key) restarts: `started`/`age` reset and it moves to the back as the
+  newest line.
+- With "Replace Vanilla notifications" off the eye is disabled; the Vanilla
+  HUD shows everything then.
 
 ## Testing notes
 

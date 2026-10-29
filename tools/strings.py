@@ -16,6 +16,7 @@ STRINGS = [
     ("historyEmpty", "No notifications yet.", "Noch keine Benachrichtigungen."),
     ("historyHide", "Hide this message in the HUD. It stays in the history; numbers match any number.", "Diese Meldung im HUD ausblenden. Sie bleibt im Verlauf; Zahlen passen auf jede Zahl."),
     ("historyUnhide", "Hidden in the HUD. Click to show it again.", "Im HUD ausgeblendet. Klicken, um sie wieder anzuzeigen."),
+    ("historyHideOff", "Hiding works while \"Replace Vanilla notifications\" is on.", "Ausblenden wirkt, solange \"Vanilla-Benachrichtigungen ersetzen\" an ist."),
     ("historyShowAll", "Show all hidden again", "Alle ausgeblendeten wieder anzeigen"),
     ("headAdvanced", "Advanced", "Erweitert"),
     ("enabled", "Replace Vanilla notifications", "Vanilla-Benachrichtigungen ersetzen"),

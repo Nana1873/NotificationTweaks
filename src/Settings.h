@@ -79,7 +79,7 @@ namespace NT
         int   ypsLimit = 80;
     };
 
-    // Render/menu thread (and startup): the full settings.
+    // Render thread (menu, overlay) and startup: the full settings.
     Settings& Config();
     void      LoadSettings();
     void      SaveSettings();
@@ -92,6 +92,6 @@ namespace NT
 
     // [Hidden]: the hide keys (Capture::HideKey) of lines the player hid in
     // the HUD. Capture owns the live set and calls these.
-    std::vector<std::string> LoadHidden();
-    void                     SaveHidden(const std::vector<std::string>& a_keys);
+    std::vector<std::string> ReadHiddenKeys();
+    void                     WriteHiddenKeys(const std::vector<std::string>& a_keys);
 }

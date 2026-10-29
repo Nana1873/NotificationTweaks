@@ -19,13 +19,36 @@ namespace
 
     // Caller holds g_lock. A line that stops being hidden starts over, so it
     // queues and fades in like a new one instead of popping up mid-life.
-    void UpdateHidden(NT::Capture::Entry& a_entry, bool a_hidden)
+    // Returns true when it restarted.
+    bool UpdateHidden(NT::Capture::Entry& a_entry, bool a_hidden)
     {
-        if (a_entry.hidden && !a_hidden) {
+        const bool restart = a_entry.hidden && !a_hidden;
+        if (restart) {
             a_entry.started = false;
             a_entry.age = 0.0F;
         }
         a_entry.hidden = a_hidden;
+        return restart;
+    }
+
+    // Caller holds g_lock. After the hide keys changed: restarted lines move
+    // to the back as the newest, so in queue mode they wait behind the lines
+    // already showing instead of stalling them.
+    void RefreshHidden()
+    {
+        const auto now = std::chrono::steady_clock::now();
+        bool       any = false;
+        for (auto& entry : g_entries) {
+            if (UpdateHidden(entry, IsHidden(entry.raw))) {
+                entry.arrival = now;
+                any = true;
+            }
+        }
+        if (any) {
+            // Lines still waiting in queue mode are unstarted too and stay in
+            // their order behind the started ones.
+            std::ranges::stable_partition(g_entries, [](const NT::Capture::Entry& a_entry) { return a_entry.started || a_entry.hidden; });
+        }
     }
 
     // Caller holds g_lock.
@@ -277,9 +300,12 @@ namespace NT::Capture
         std::string key;
         key.reserve(a_visible.size());
         for (std::size_t i = 0; i < a_visible.size(); ++i) {
-            if (std::isdigit(static_cast<unsigned char>(a_visible[i]))) {
+            // ASCII only: std::isdigit depends on the CRT locale and can
+            // match UTF-8 continuation bytes (0xB2, 0xB3, 0xB9 in cp1252).
+            const auto digit = [&](std::size_t a_pos) { return a_visible[a_pos] >= '0' && a_visible[a_pos] <= '9'; };
+            if (digit(i)) {
                 key += '#';
-                while (i + 1 < a_visible.size() && std::isdigit(static_cast<unsigned char>(a_visible[i + 1]))) {
+                while (i + 1 < a_visible.size() && digit(i + 1)) {
                     ++i;
                 }
             } else {
@@ -291,7 +317,7 @@ namespace NT::Capture
 
     void LoadHidden()
     {
-        auto             keys = NT::LoadHidden();
+        auto             keys = NT::ReadHiddenKeys();
         std::scoped_lock lock{ g_lock };
         g_hidden = { std::make_move_iterator(keys.begin()), std::make_move_iterator(keys.end()) };
     }
@@ -313,13 +339,11 @@ namespace NT::Capture
             if (a_hidden ? !g_hidden.insert(a_key).second : g_hidden.erase(a_key) == 0) {
                 return;
             }
-            for (auto& entry : g_entries) {
-                UpdateHidden(entry, IsHidden(entry.raw));
-            }
+            RefreshHidden();
             keys.assign(g_hidden.begin(), g_hidden.end());
         }
-        // Outside the lock: every profile write rewrites the whole INI.
-        NT::SaveHidden(keys);
+        // File I/O outside the lock, so Push on the game thread never waits on it.
+        NT::WriteHiddenKeys(keys);
         logs::info("{} in the HUD: {}", a_hidden ? "Hidden" : "Shown again", a_key);
     }
 
@@ -328,11 +352,9 @@ namespace NT::Capture
         {
             std::scoped_lock lock{ g_lock };
             g_hidden.clear();
-            for (auto& entry : g_entries) {
-                UpdateHidden(entry, false);
-            }
+            RefreshHidden();
         }
-        NT::SaveHidden({});
+        NT::WriteHiddenKeys({});
         logs::info("All hidden lines shown again");
     }
 

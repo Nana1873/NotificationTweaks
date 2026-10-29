@@ -38,13 +38,19 @@ if (-not (Test-Path $ini)) {
     Set-Content -Path $ini -Value '; Notification Tweaks settings, written by the in-game menu (SKSE Menu Framework).' -Encoding ascii
 }
 
+$version = (Get-Content (Join-Path $root 'vcpkg.json') -Raw | ConvertFrom-Json).'version-semver'
 $meta = Join-Path $mod 'meta.ini'
-if (-not (Test-Path $meta)) {
+if (Test-Path $meta) {
+    # Keep the version MO2 shows in step with the build.
+    $text = Get-Content $meta -Raw
+    $updated = $text -replace '(?m)^version=.*$', "version=$version"
+    if ($updated -ne $text) { Set-Content -Path $meta -Value $updated -Encoding ascii -NoNewline }
+} else {
     @(
         '[General]'
         'gameName=skyrimse'
         'modid=0'
-        'version=1.0.0'
+        "version=$version"
         'category=0'
         'comments="Eigenes SKSE-Plugin: ersetzt die Vanilla-HUD-Benachrichtigungen (Position, Sofortanzeige, YPS/BoS-Zusammenfuehrung); Einstellungen im SKSE Menu Framework"'
         ''

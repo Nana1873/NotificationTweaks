@@ -12,7 +12,7 @@ namespace
 {
     constexpr auto kSectionName = "Notification Tweaks";
 
-    // Two-click confirmation for the reset button.
+    // Two-click confirmation for the reset and "show all hidden" buttons.
     constexpr double kConfirmSeconds = 4.0;
     double           g_confirmUntil = 0.0;
     double           g_showAllConfirmUntil = 0.0;
@@ -37,7 +37,7 @@ namespace
 
     void Tooltip(const std::string& a_text)
     {
-        if (ImGuiMCP::IsItemHovered()) {
+        if (ImGuiMCP::IsItemHovered(ImGuiMCP::ImGuiHoveredFlags_AllowWhenDisabled)) {
             ImGuiMCP::SetTooltip("%s", a_text.c_str());
         }
     }
@@ -312,12 +312,14 @@ namespace
         const auto& t = NT::Translation::S();
         // Hiding only acts on the plugin's own lines; with the plugin off the
         // Vanilla HUD shows everything.
-        ImGuiMCP::BeginDisabled(!NT::CaptureEnabled());
+        const bool enabled = NT::CaptureEnabled();
+        ImGuiMCP::BeginDisabled(!enabled);
         FontAwesome::PushSolid();
-        const bool clicked = ImGuiMCP::SmallButton(std::format("{}##hide{}", a_hidden ? kIconEyeSlash : kIconEye, a_id).c_str());
+        // "###": the ID stays the same when the icon flips.
+        const bool clicked = ImGuiMCP::SmallButton(std::format("{}###hide{}", a_hidden ? kIconEyeSlash : kIconEye, a_id).c_str());
         FontAwesome::Pop();
         ImGuiMCP::EndDisabled();
-        Tooltip(a_hidden ? t.historyUnhide : t.historyHide);
+        Tooltip(!enabled ? t.historyHideOff : a_hidden ? t.historyUnhide : t.historyHide);
         if (clicked) {
             NT::Capture::SetHidden(a_key, !a_hidden);
         }
@@ -345,7 +347,7 @@ namespace
             ImGuiMCP::SameLine();
             const auto now = ImGuiMCP::GetTime();
             const bool armed = now < g_showAllConfirmUntil;
-            if (ImGuiMCP::Button(((armed ? t.resetConfirm : std::format("{} ({})", t.historyShowAll, hidden.size())) + "##showall").c_str())) {
+            if (ImGuiMCP::Button(((armed ? t.resetConfirm : std::format("{} ({})", t.historyShowAll, hidden.size())) + "###showall").c_str())) {
                 if (armed) {
                     g_showAllConfirmUntil = 0.0;
                     NT::Capture::ClearHidden();
@@ -361,35 +363,33 @@ namespace
             bool                                  any = false;
             std::deque<NT::Capture::HistoryEntry> history;
             NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) { history = a_history; });
-            {
-                for (auto it = history.rbegin(); it != history.rend(); ++it) {
-                    if (!needle.empty() && Lowercase(it->text).find(needle) == std::wstring::npos) {
-                        continue;
-                    }
-                    any = true;
-                    const auto key = NT::Capture::HideKey(it->text);
-                    const bool isHidden = hidden.contains(key);
-                    HideToggle(key, isHidden, it->id);
-                    ImGuiMCP::SameLine();
-                    ImGuiMCP::TextDisabled("%s", LocalTime(it->time).c_str());
-                    ImGuiMCP::SameLine();
-                    const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
-                    if (isHidden) {
-                        ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled));
-                        ImGuiMCP::TextWrapped("%s", line.c_str());
-                        ImGuiMCP::PopStyleColor();
-                        continue;
-                    }
-                    if (it->rgb) {
-                        const auto rgb = *it->rgb;
-                        ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text,
-                            { static_cast<float>((rgb >> 16) & 0xFF) / 255.0F, static_cast<float>((rgb >> 8) & 0xFF) / 255.0F,
-                                static_cast<float>(rgb & 0xFF) / 255.0F, 1.0F });
-                    }
+            for (auto it = history.rbegin(); it != history.rend(); ++it) {
+                if (!needle.empty() && Lowercase(it->text).find(needle) == std::wstring::npos) {
+                    continue;
+                }
+                any = true;
+                const auto key = NT::Capture::HideKey(it->text);
+                const bool isHidden = hidden.contains(key);
+                HideToggle(key, isHidden, it->id);
+                ImGuiMCP::SameLine();
+                ImGuiMCP::TextDisabled("%s", LocalTime(it->time).c_str());
+                ImGuiMCP::SameLine();
+                const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
+                if (isHidden) {
+                    ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled));
                     ImGuiMCP::TextWrapped("%s", line.c_str());
-                    if (it->rgb) {
-                        ImGuiMCP::PopStyleColor();
-                    }
+                    ImGuiMCP::PopStyleColor();
+                    continue;
+                }
+                if (it->rgb) {
+                    const auto rgb = *it->rgb;
+                    ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text,
+                        { static_cast<float>((rgb >> 16) & 0xFF) / 255.0F, static_cast<float>((rgb >> 8) & 0xFF) / 255.0F,
+                            static_cast<float>(rgb & 0xFF) / 255.0F, 1.0F });
+                }
+                ImGuiMCP::TextWrapped("%s", line.c_str());
+                if (it->rgb) {
+                    ImGuiMCP::PopStyleColor();
                 }
             }
             if (!any) {

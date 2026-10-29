@@ -1,8 +1,9 @@
 #pragma once
 
 // Rules that decide whether a notification continues the previous one.
-// Both texts are the raw bytes the sender passed (before any re-encoding),
-// because the YPS rule recomputes YPS's own byte-based split position.
+// Both texts are raw bytes as captured (a lone "$Key" already translated,
+// otherwise not re-encoded), because the YPS rule recomputes YPS's own
+// byte-based split position.
 namespace NT::Merge
 {
     enum class Rule

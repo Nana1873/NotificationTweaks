@@ -41,7 +41,7 @@ namespace NT::Capture
     // Main thread: a notification the HUD would have shown.
     void Push(std::string_view a_raw);
 
-    // Overlay thread: exclusive access to the live entries, oldest first.
+    // Render thread (overlay): exclusive access to the live entries, oldest first.
     void Visit(const std::function<void(std::deque<Entry>&)>& a_visitor);
 
     // Main thread, before a save is loaded or a new game starts: drops the
@@ -49,7 +49,7 @@ namespace NT::Capture
     // Loading screens inside a session keep them (they wait, see Overlay).
     void ClearActive();
 
-    // Menu thread: the history, oldest first, and clearing it.
+    // Render thread (menu): the history, oldest first, and clearing it.
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor);
     void ClearHistory();
 

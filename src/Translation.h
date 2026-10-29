@@ -22,6 +22,7 @@ namespace NT::Translation
         std::string historyEmpty = "No notifications yet.";
         std::string historyHide = "Hide this message in the HUD. It stays in the history; numbers match any number.";
         std::string historyUnhide = "Hidden in the HUD. Click to show it again.";
+        std::string historyHideOff = "Hiding works while \"Replace Vanilla notifications\" is on.";
         std::string historyShowAll = "Show all hidden again";
         std::string headAdvanced = "Advanced";
         std::string enabled = "Replace Vanilla notifications";

@@ -19,7 +19,7 @@ namespace NT::Markup
 
     std::vector<Run> Parse(std::string_view a_raw);
 
-    // Tag-free text (entities decoded), for the merge heuristics.
+    // Tag-free text (entities decoded): merge heuristics, history and hide keys.
     std::string Visible(std::string_view a_raw);
 
     // The color of the outermost <font color> when it wraps the whole text.
