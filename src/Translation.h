@@ -67,9 +67,9 @@ namespace NT::Translation
         std::string resetConfirm = "Confirm?";
         std::string footer = "Changes apply immediately and are saved.";
         std::string compatHint = "Some mods split one long message into two notifications. These rules put the halves back into one line.";
-        std::string mergeYps = "YPS Immersive Fashion: merge split thoughts";
+        std::string mergeYps = "YPS: merge split thoughts";
         std::string mergeYpsTip = "Recognizes the exact split position YPS uses for thoughts longer than its limit (80 characters by default).";
-        std::string mergeBos = "Bimbos of Skyrim: merge split thoughts";
+        std::string mergeBos = "BoS: merge split thoughts";
         std::string mergeBosTip = "Pink thought lines (CustomComments.esp) whose first part does not end a sentence.";
         std::string mergeGeneric = "All mods: merge obvious continuations";
         std::string mergeGenericTip = "First line without a sentence end, second line starts lowercase. Can also join unrelated messages.";

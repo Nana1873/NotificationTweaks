@@ -25,8 +25,7 @@ plugins put in the top left corner) and draws them itself through
   full-screen menu is open appear when it closes (optional). Lines sent
   right before a loading screen show up after it.
 - Compatibility page: merges messages that some mods split into two
-  notifications (YPS Immersive Fashion, Bimbos of Skyrim, optional generic
-  rule).
+  notifications (YPS and BoS thoughts, optional generic rule).
 - Identical repeats stack as "(x2)". `$Key` notifications are translated
   like Vanilla does. Quest, skill and level messages stay Vanilla.
 - Save-neutral: nothing is written to the save. Settings live in
