@@ -112,39 +112,14 @@ namespace
         }
 
         // Then the translator's virtual Translate(), exactly what Scaleform
-        // calls for "$Key" strings in menus.
+        // calls for "$Key" strings in menus. Only through that call: the
+        // installed translator is not always a BSScaleformTranslator
+        // (ScaleformTranslationPP replaces it), so reading its
+        // translationMap directly walked foreign memory and crashed on a
+        // key nobody translates (1.0.0, SE 1.5.97, "$qlie_..." key).
         if (std::string result; SKSE::Translation::Translate(std::string(a_key), result) && !result.empty() &&
                                 result != a_key) {
             return result;
-        }
-
-        const auto* manager = RE::BSScaleformManager::GetSingleton();
-        if (!manager || !manager->loader) {
-            return std::nullopt;
-        }
-        const auto translator = manager->loader->GetState<RE::BSScaleformTranslator>(RE::GFxState::StateType::kTranslator);
-        if (!translator) {
-            return std::nullopt;
-        }
-        const auto& map = translator->translator.translationMap;
-        // Last, translationMap directly: the engine's own table
-        // (interface/translate_<lang>.txt) and SKSE-imported plugin files may
-        // key entries differently ("$Effects" vs "Effects"), which
-        // Translate() does not try, so look up the key as given and without
-        // its '$'.
-        for (const auto candidate : { a_key, a_key.substr(1) }) {
-            if (candidate.empty()) {
-                continue;
-            }
-            const RE::BSFixedStringW key{ NT::Text::ToWide(candidate).c_str() };
-            const auto               it = map.find(key);
-            if (it == map.end()) {
-                continue;
-            }
-            const auto* wide = it->second.c_str();
-            if (auto translated = wide ? NT::Text::ToUtf8(wide) : std::string{}; !translated.empty()) {
-                return translated;
-            }
         }
         return std::nullopt;
     }
