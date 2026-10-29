@@ -206,6 +206,34 @@ namespace NT::Markup
         return std::string(NT::Text::Trim(out));
     }
 
+    IconList Icons(std::string_view a_raw)
+    {
+        IconList icons;
+        for (const auto& run : Parse(a_raw)) {
+            for (std::size_t i = 0; !run.iconFace.empty() && i < run.text.size();) {
+                if (const auto code = NT::Text::NextCodePoint(run.text, i); code != U' ' && code != U'\t') {
+                    icons.emplace_back(run.iconFace, code);
+                }
+            }
+        }
+        return icons;
+    }
+
+    std::string IconKey(const IconList& a_icons)
+    {
+        if (a_icons.empty()) {
+            return {};
+        }
+        std::string key = "[icon]";
+        for (const auto& [face, code] : a_icons) {
+            key += ' ';
+            key += face;
+            key += ':';
+            NT::Text::AppendUtf8(code, key);
+        }
+        return key;
+    }
+
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw)
     {
         const auto trimmed = NT::Text::Trim(a_raw);

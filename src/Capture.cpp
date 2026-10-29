@@ -16,7 +16,11 @@ namespace
     // Caller holds g_lock.
     bool IsHidden(std::string_view a_raw)
     {
-        return !g_hidden.empty() && g_hidden.contains(NT::Text::HideKey(NT::Markup::Visible(a_raw)));
+        if (g_hidden.empty()) {
+            return false;
+        }
+        const auto text = NT::Markup::Visible(a_raw);
+        return g_hidden.contains(text.empty() ? NT::Markup::IconKey(NT::Markup::Icons(a_raw)) : NT::Text::HideKey(text));
     }
 
     // Caller holds g_lock. A line that stops being hidden starts over, so it
@@ -58,14 +62,7 @@ namespace
     {
         a_entry.text = NT::Markup::Visible(a_raw);
         a_entry.rgb = NT::Markup::WrappingColor(a_raw);
-        a_entry.icons.clear();
-        for (const auto& run : NT::Markup::Parse(a_raw)) {
-            for (std::size_t i = 0; !run.iconFace.empty() && i < run.text.size();) {
-                if (const auto code = NT::Text::NextCodePoint(run.text, i); code != U' ' && code != U'\t') {
-                    a_entry.icons.emplace_back(run.iconFace, code);
-                }
-            }
-        }
+        a_entry.icons = NT::Markup::Icons(a_raw);
     }
 
     // Caller holds g_lock.
@@ -261,8 +258,11 @@ namespace NT::Capture
         const auto             resolved = Resolve(a_raw);
         const std::string_view raw = resolved;
         if (!DrawableResolved(raw)) {
-            RecordResolved(raw);  // the Vanilla HUD shows it; the history still lists it
-            return false;
+            std::scoped_lock lock{ g_lock };
+            AddHistory(g_nextID++, raw);  // the history lists it either way
+            // Hidden stays hidden even when we cannot draw it (icon fonts
+            // off or missing): swallow it instead of handing it to Vanilla.
+            return IsHidden(raw);
         }
 
         const auto s = CaptureConfig();

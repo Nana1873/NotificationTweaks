@@ -30,7 +30,7 @@ namespace NT::Capture
         std::string                           text;   // visible UTF-8, tags removed
         std::optional<std::uint32_t>          rgb;    // wrapping <font color>, if any
         int                                   count = 1;
-        std::vector<std::pair<std::string, char32_t>> icons;  // icon-font glyphs (face, code), shown before the text
+        Markup::IconList                      icons;  // icon-font glyphs (face, code), shown before the text
     };
 
     // Keep in step with historyHint in tools/strings.py ("The last 100 ...").
@@ -46,7 +46,7 @@ namespace NT::Capture
     // Main thread: a notification the HUD would have shown. False when the
     // line has nothing the overlay can draw (only icons of a font IconFont
     // cannot load, or icon fonts switched off); the caller then leaves it
-    // to the Vanilla HUD.
+    // to the Vanilla HUD. A hidden line is always taken (true), drawable or not.
     bool Push(std::string_view a_raw);
 
     // Render thread (overlay): exclusive access to the live entries, oldest first.

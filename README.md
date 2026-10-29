@@ -19,8 +19,9 @@ plugins put in the top left corner) and draws them itself through
   hides that message in the HUD from then on; it still shows up in the
   history (grey, closed eye). Numbers count as any number, so hiding
   "25 Gold added" also hides "30 Gold added". Click the eye again, or use
-  "Show all hidden again", to bring them back. Saved in the INI under
-  `[Hidden]`.
+  "Show all hidden again", to bring them back. Lines that are only an
+  icon (like OII's save icon) can be hidden the same way. Saved in the
+  INI under `[Hidden]`.
 - **Waits for menus:** lines that arrive while the inventory, map or another
   full-screen menu is open appear when it closes (optional). Lines sent
   right before a loading screen show up after it.

@@ -139,6 +139,10 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 - The eye on a History line hides by key: `Text::HideKey` turns the
   visible text (`Markup::Visible`) into a key with every ASCII digit run
   replaced by `#`, so "25 Gold added" and "30 Gold added" share one key.
+  A line without text is keyed by its icon glyphs instead
+  (`Markup::IconKey`, e.g. `[icon] $Iconographia:w`). A hidden line stays
+  hidden even when it cannot be drawn (icon fonts off or missing):
+  `Capture::Push` swallows it instead of handing it to Vanilla.
 - Keys live in `[Hidden]` as `Count` plus `Line1..N`, each value quoted
   (the profile API strips outer quotes, keeping edge spaces) and
   `%XX`-escaped for bytes >= 0x80, < 0x20 and `%` (the A-API goes through

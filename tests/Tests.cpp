@@ -89,6 +89,10 @@ namespace
         CHECK(Visible("<font face=\"$Iconographia\">W</font> Saving") == Visible("Saving"));
         const auto iconRuns = Parse("<font face='$Iconographia'> w </font>Saved");
         CHECK(IsIconFace("$Iconographia") && IsIconFace("$SkyrimSymbolsFont") && !IsIconFace("$EverywhereFont"));
+        const auto saveIcons = Icons("<font face='$Iconographia'> w </font>");
+        CHECK(saveIcons.size() == 1 && saveIcons[0].first == "$Iconographia" && saveIcons[0].second == U'w');
+        CHECK(IconKey(saveIcons) == "[icon] $Iconographia:w");
+        CHECK(IconKey(Icons("plain text")).empty());
         CHECK(iconRuns.size() == 2 && iconRuns[0].iconFace == "$Iconographia" && iconRuns[0].text == " w " && iconRuns[1].iconFace.empty());
 
         const auto runs = Parse("a <font color=\"#112233\">b</font> c");

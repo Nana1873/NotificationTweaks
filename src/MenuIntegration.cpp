@@ -391,12 +391,13 @@ namespace
                     continue;
                 }
                 any = true;
-                // Icon-only lines have no text to hide by: an invisible eye
+                // Icon-only lines are keyed by their glyphs; a line with
+                // neither (nothing left at all) gets an invisible eye that
                 // keeps the columns aligned.
                 const bool iconsOnly = it->text.empty();
-                const auto key = iconsOnly ? std::string{} : NT::Text::HideKey(it->text);
-                const bool isHidden = !iconsOnly && hidden.contains(key);
-                if (iconsOnly) {
+                const auto key = iconsOnly ? NT::Markup::IconKey(it->icons) : NT::Text::HideKey(it->text);
+                const bool isHidden = !key.empty() && hidden.contains(key);
+                if (key.empty()) {
                     EyeSpacer(it->id);
                 } else {
                     HideToggle(key, isHidden, it->id);

@@ -33,6 +33,14 @@ namespace NT::Markup
     // heuristics, history and hide keys.
     std::string Visible(std::string_view a_raw);
 
+    // The icon-font glyphs of a line as (face, code), whitespace skipped.
+    using IconList = std::vector<std::pair<std::string, char32_t>>;
+    IconList Icons(std::string_view a_raw);
+
+    // Hide key of an icon-only line ("[icon] $Iconographia:w"); a line with
+    // text is keyed by its text instead (Text::HideKey of Visible()).
+    std::string IconKey(const IconList& a_icons);
+
     // The color of the outermost <font color> when it wraps the whole text.
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw);
 }
