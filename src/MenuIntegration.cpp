@@ -263,16 +263,21 @@ namespace
         Tooltip(t.mergeBosTip);
         Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
         Tooltip(t.mergeGenericTip);
-        Commit(ImGuiMCP::Checkbox((t.drawIconFonts + "##iconfonts").c_str(), &s.drawIconFonts));
+        if (const bool changed = ImGuiMCP::Checkbox((t.drawIconFonts + "##iconfonts").c_str(), &s.drawIconFonts); changed) {
+            NT::SaveSettings();
+            if (s.drawIconFonts) {
+                NT::IconFont::Preload();  // off at startup: load now, not in the middle of play
+            }
+        }
         Tooltip(t.drawIconFontsTip);
         if (s.drawIconFonts) {
-            // Reads fontconfig.txt and the icon fonts once; cached afterwards.
-            const auto found = NT::IconFont::Found();
+            const auto found = NT::IconFont::Found();  // cached after the first load
             if (found.empty()) {
                 ImGuiMCP::TextDisabled("    %s", t.iconFontsNone.c_str());
             } else {
+                ImGuiMCP::TextDisabled("    %s", t.iconFontsFound.c_str());
                 for (const auto& [face, glyphs] : found) {
-                    ImGuiMCP::TextDisabled("    %s %s (%zu %s)", t.iconFontsFound.c_str(), face.c_str(), glyphs, t.iconFontGlyphs.c_str());
+                    ImGuiMCP::TextDisabled("      %s (%zu %s)", face.c_str(), glyphs, t.iconFontGlyphs.c_str());
                 }
             }
         }

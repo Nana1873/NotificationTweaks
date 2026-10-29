@@ -88,7 +88,7 @@ namespace NT
         bool  mergeGeneric = false; // any two lines: no sentence end + lowercase continuation
         float mergeWindow = 0.35F;  // seconds the second half may arrive after the first
         int   ypsLimit = 80;        // YPS LongThoughtLimit (MCM); only longer thoughts are split
-        bool  drawIconFonts = true; // draw icon-font glyphs (Oblivion Interaction Icons) from the mod's own font library
+        bool  drawIconFonts = true; // draw icon-font glyphs (Oblivion Interaction Icons) from the library fontconfig.txt maps the face to
     };
 
     // The values the game thread reads while capturing. The menu and the

@@ -9,17 +9,10 @@ namespace
         return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, a_text.data(), static_cast<int>(a_text.size()), nullptr, 0) > 0;
     }
 
-    std::string Lower(std::string_view a_text)
-    {
-        std::string out(a_text);
-        std::ranges::transform(out, out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return out;
-    }
-
     // Value of attribute a_name inside a tag body ("font color='#FF00FF' size='20'").
     std::optional<std::string> Attribute(std::string_view a_tag, std::string_view a_name)
     {
-        const auto lower = Lower(a_tag);
+        const auto lower = NT::Text::LowerAscii(a_tag);
         auto       pos = lower.find(a_name);
         while (pos != std::string::npos) {
             // Whole attribute names only ("color", not the tail of "bgcolor").
@@ -49,16 +42,6 @@ namespace
             pos = lower.find(a_name, pos + 1);
         }
         return std::nullopt;
-    }
-
-    // Icon fonts map pictures onto letters ("$Iconographia" from Oblivion
-    // Interaction Icons draws its save icon as "W", the game's own
-    // "$SkyrimSymbolsFont" works the same way). The overlay cannot draw
-    // those fonts, so their text is dropped instead of showing the letter.
-    bool IsIconFace(std::string_view a_face)
-    {
-        const auto lower = Lower(a_face);
-        return lower.find("icon") != std::string::npos || lower.find("symbol") != std::string::npos;
     }
 
     std::optional<std::uint32_t> ParseColor(std::string_view a_value)
@@ -104,6 +87,12 @@ namespace
 
 namespace NT::Markup
 {
+    bool IsIconFace(std::string_view a_face)
+    {
+        const auto lower = NT::Text::LowerAscii(a_face);
+        return lower.find("icon") != std::string::npos || lower.find("symbol") != std::string::npos;
+    }
+
     std::string ToUtf8(std::string_view a_raw)
     {
         if (a_raw.empty() || IsValidUtf8(a_raw)) {
@@ -150,7 +139,7 @@ namespace NT::Markup
                     break;
                 }
                 const std::string_view tag{ text.data() + i + 1, end - i - 1 };
-                const auto             lower = Lower(tag);
+                const auto             lower = NT::Text::LowerAscii(tag);
                 if (lower.starts_with("font")) {
                     const auto color = Attribute(tag, "color");
                     const auto rgb = color ? ParseColor(*color) : std::nullopt;
@@ -160,7 +149,7 @@ namespace NT::Markup
                     if (rgb) {
                         colors.push_back(rgb);
                     }
-                    iconFaces.push_back(face ? (IsIconFace(*face) ? *face : std::string{}) : iconFaces.back());
+                    iconFaces.push_back(face ? (NT::Markup::IsIconFace(*face) ? *face : std::string{}) : iconFaces.back());
                     current.rgb = colors.back();
                     current.iconFace = iconFaces.back();
                 } else if (lower.starts_with("/font")) {
@@ -220,7 +209,7 @@ namespace NT::Markup
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw)
     {
         const auto trimmed = NT::Text::Trim(a_raw);
-        const auto lower = Lower(trimmed);
+        const auto lower = NT::Text::LowerAscii(trimmed);
         if (!lower.starts_with("<font") || !lower.ends_with("</font>")) {
             return std::nullopt;
         }

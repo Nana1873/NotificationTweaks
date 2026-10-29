@@ -78,7 +78,7 @@ namespace NT::Translation
         std::string drawIconFonts = "Draw icon fonts (e.g. Oblivion Interaction Icons)";
         std::string drawIconFontsTip = "Some mods put icons from their own font into messages, like the OII save icon. On: the plugin reads that font and draws the icons with the lines. Off: icons are left out; a message that is only an icon goes to the Vanilla HUD.";
         std::string iconFontsFound = "Icon fonts found:";
-        std::string iconFontsNone = "No icon font installed.";
+        std::string iconFontsNone = "No icon font found.";
         std::string iconFontGlyphs = "icons";
         std::string historyIconOnly = "(icon)";
         std::string testYps = "Test YPS split";

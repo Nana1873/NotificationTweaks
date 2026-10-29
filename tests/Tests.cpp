@@ -1,5 +1,6 @@
 // Unit tests for the pure parts of the plugin: merge rules, markup parsing,
-// hide keys and INI escaping. Built with the plugin; tools\build.ps1 runs
+// hide keys, INI escaping, fontconfig parsing, the SWF glyph rasterizer and
+// atlas level choice. Built with the plugin; tools\build.ps1 runs
 // the exe and fails the build when a check fails.
 
 #include "Markup.h"
@@ -59,7 +60,7 @@ namespace
         CHECK(NextCodePoint(mixed, pos) == U'w');
         CHECK(NextCodePoint(mixed, pos) == U'ä');
         CHECK(NextCodePoint(mixed, pos) == U'\U0001F600');
-        CHECK(NextCodePoint(mixed, pos) == U'�' && pos == mixed.size());
+        CHECK(NextCodePoint(mixed, pos) == U'\uFFFD' && pos == mixed.size());
     }
 
     void TestMarkup()
@@ -79,13 +80,14 @@ namespace
         CHECK(ToUtf8("\xE4") == "\xC3\xA4");             // Windows-1252 fallback
         CHECK(ToUtf8("\xC3\xA4") == "\xC3\xA4");         // valid UTF-8 stays
 
-        // Icon fonts (Oblivion Interaction Icons, vanilla symbols): glyph dropped, text kept.
+        // Icon fonts (Oblivion Interaction Icons, vanilla symbols): icon runs left out of Visible().
         CHECK(Visible("<font face=\"$Iconographia\">W</font> Saving...") == "Saving...");
         CHECK(Visible("<font face='$SkyrimSymbolsFont' color='#FFFFFF'>A</font>Text") == "Text");
         CHECK(Visible("<font face=\"$Iconographia\"><font color=\"#FF0000\">W</font></font> x") == "x");
         CHECK(Visible("<font face=\"$EverywhereFont\">Normal</font>") == "Normal");
         CHECK(Visible("<font face=\"$Iconographia\">W</font> Saving") == Visible("Saving"));
         const auto iconRuns = Parse("<font face='$Iconographia'> w </font>Saved");
+        CHECK(IsIconFace("$Iconographia") && IsIconFace("$SkyrimSymbolsFont") && !IsIconFace("$EverywhereFont"));
         CHECK(iconRuns.size() == 2 && iconRuns[0].iconFace == "$Iconographia" && iconRuns[0].text == " w " && iconRuns[1].iconFace.empty());
 
         const auto runs = Parse("a <font color=\"#112233\">b</font> c");
@@ -148,6 +150,20 @@ namespace
         CHECK(hole[4 * 8 + 4] == 0 && hole[1 * 8 + 1] == 255);
 
         CHECK(!Load(std::span<const std::uint8_t>{}, "x"));
+
+        // Keyword case, a broken quote, a map without its font name.
+        const auto odd = ParseFontConfig("FontLib \"Interface\\a.swf\"\nfontlib \"broken\nmap \"$Only\"\n");
+        CHECK(odd.libs.size() == 1 && odd.libs[0] == "Interface\\a.swf" && odd.maps.empty());
+
+        // Atlas level: smallest raster height still >= the line height.
+        constexpr int kLevels[] = { 96, 48, 24 };
+        CHECK(PickLevel(kLevels, 100.0F) == 0);
+        CHECK(PickLevel(kLevels, 96.0F) == 0);
+        CHECK(PickLevel(kLevels, 49.0F) == 0);
+        CHECK(PickLevel(kLevels, 48.0F) == 1);
+        CHECK(PickLevel(kLevels, 30.0F) == 1);
+        CHECK(PickLevel(kLevels, 24.0F) == 2);
+        CHECK(PickLevel(kLevels, 10.0F) == 2);
 
         // Optional: a real font library, e.g. NT_TEST_SWF=...\Fonticon.swf
         // NT_TEST_FONT=Iconographia; writes the "w" glyph as glyph_w.pgm.

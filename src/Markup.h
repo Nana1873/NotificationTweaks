@@ -15,6 +15,13 @@ namespace NT::Markup
         std::string                  iconFace;           // "$Iconographia": text is icon-font glyphs
     };
 
+    // Icon fonts map pictures onto letters ("$Iconographia" from Oblivion
+    // Interaction Icons draws its save icon as "w", the game's own
+    // "$SkyrimSymbolsFont" works the same way): a face whose name contains
+    // "icon" or "symbol". Parse marks such runs with iconFace (IconFont
+    // draws them); Visible() leaves them out.
+    bool IsIconFace(std::string_view a_face);
+
     // Notification text arrives in whatever encoding the sender used:
     // UTF-8 from most sources, Windows-1252 from Papyrus strings read out of
     // legacy files (YPS thought JSON). Invalid UTF-8 is treated as 1252.

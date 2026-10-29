@@ -87,6 +87,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 
 - `Data/SKSE/Plugins/NotificationTweaks.ini`; the dev mod ships an empty
   one so USVFS writes back into the mod instead of overwrite.
+- `$Key` notifications are translated through our table, then only the
+  translator's virtual `Translate()`. Never read `translationMap` (or any
+  translator member) directly: ScaleformTranslationPP installs its own
+  translator, and that read crashed 1.0.0 on SE 1.5.97 for a key nobody
+  translates.
 - Translations are parsed into the plugin's own table (never
   `SKSE::Translation::ParseTranslation`, which crashed Quick Audio Sliders
   1.0.0 by writing the engine table during startup). English defaults are
@@ -110,7 +115,8 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   capped, and loading runs in try/catch (a bad file means no icons, never
   a crash).
 - `IconFont::Preload` loads every icon face fontconfig.txt maps at
-  kDataLoaded (about 0.3 s with OII and the vanilla `$SkyrimSymbolsFont`
+  kDataLoaded (and again when "Draw icon fonts" is switched on in the
+  menu after starting with it off) (about 0.3 s with OII and the vanilla `$SkyrimSymbolsFont`
   from fonts_en.swf), so nothing is read during play. Glyphs are packed
   into one white RGBA atlas (alpha = coverage) at 96, 48 and 24 px; the
   overlay samples the level closest above its line height, because the
@@ -148,11 +154,16 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 
 ## Testing notes
 
-- Unit tests (`tests/Tests.cpp`, built and run by `tools/build.ps1`) cover
-  the pure code: YPS/BoS/generic merge rules, markup parsing and entities,
-  the 1252 fallback, hide keys and the `[Hidden]` escaping. They link
-  `Merge.cpp` and `Markup.cpp` against `tests/TestPCH.h` (no CommonLibSSE,
-  `logs::` is a no-op). Hooks, overlay and menu stay in-game tests.
+- Unit tests (`tests/Tests.cpp`, built and run by `tools/build.ps1` and
+  again by `package.ps1`) cover the pure code: YPS/BoS/generic merge
+  rules, markup parsing, entities and icon runs, the 1252 fallback, hide
+  keys, the `[Hidden]` escaping, UTF-8 code points, fontconfig parsing,
+  the even-odd rasterizer and the atlas level choice. They link
+  `Merge.cpp`, `Markup.cpp` and `SwfFont.cpp` (with zlib) against
+  `tests/TestPCH.h` (no CommonLibSSE, `logs::` is a no-op). Setting
+  `NT_TEST_SWF` (path to a .swf) and `NT_TEST_FONT` (font name) also loads
+  a real font library and writes its "w" glyph as `glyph_w.pgm`. Hooks,
+  overlay, textures and menu stay in-game tests.
 - `tools/deploy.ps1 [-Register]`, then
   `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Most tests need
   no save: `coc riverwood` (DevBench console) from the main menu avoids

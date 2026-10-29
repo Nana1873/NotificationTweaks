@@ -29,6 +29,18 @@ namespace NT::Text
         return result;
     }
 
+    // ASCII-only lowercase, for tag, attribute and font names.
+    inline std::string LowerAscii(std::string_view a_text)
+    {
+        std::string out(a_text);
+        for (auto& c : out) {
+            if (c >= 'A' && c <= 'Z') {
+                c = static_cast<char>(c - 'A' + 'a');
+            }
+        }
+        return out;
+    }
+
     // Unicode lowercase (CharLowerBuffW), UTF-8 in and out.
     inline std::string Lower(std::string_view a_utf8)
     {
@@ -71,18 +83,19 @@ namespace NT::Text
         }
     }
 
-    // The code point at a_pos (advanced past it); U+FFFD for a broken sequence.
+    // The code point at a_pos (advanced past it); U+FFFD for a broken
+    // sequence. Requires a_pos < a_text.size().
     inline char32_t NextCodePoint(std::string_view a_text, std::size_t& a_pos)
     {
         const auto byte = static_cast<unsigned char>(a_text[a_pos++]);
         const int  extra = byte < 0x80 ? 0 : (byte >> 5) == 0x06 ? 1 : (byte >> 4) == 0x0E ? 2 : (byte >> 3) == 0x1E ? 3 : -1;
         if (extra < 0) {
-            return U'�';
+            return U'\uFFFD';
         }
         char32_t code = extra == 0 ? byte : byte & (0x3F >> extra);
         for (int i = 0; i < extra; ++i) {
             if (a_pos >= a_text.size() || (static_cast<unsigned char>(a_text[a_pos]) & 0xC0) != 0x80) {
-                return U'�';
+                return U'\uFFFD';
             }
             code = (code << 6) | (static_cast<unsigned char>(a_text[a_pos++]) & 0x3F);
         }

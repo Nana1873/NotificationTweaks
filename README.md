@@ -31,8 +31,9 @@ plugins put in the top left corner) and draws them itself through
 - Icon fonts (e.g. Oblivion Interaction Icons' `$Iconographia`): the
   plugin reads the font library `Interface/fontconfig.txt` maps the face
   to (OII's `Fonticon.swf`, from your own install) and draws the real
-  icons with the lines. Nothing is loaded unless a message uses such a
-  font. With "Draw icon fonts" off (`DrawIconFonts=0`), or when the font
+  icons with the lines. Icon fonts mapped in fontconfig.txt are read once
+  at startup (the vanilla `$SkyrimSymbolsFont` and, with OII,
+  `$Iconographia`). With "Draw icon fonts" off (`DrawIconFonts=0`), or when the font
   cannot be read, icons are left out and an icon-only line goes to the
   Vanilla HUD.
 - Save-neutral: nothing is written to the save. Settings live in
@@ -57,7 +58,10 @@ Vanilla HUD at once (the history keeps recording).
 
 - `src/` plugin source: `Capture.*` hooks and line store, `Merge.*` merge
   rules, `Markup.*` htmlText subset, `Overlay.*` drawing and drag mode,
-  `MenuIntegration.*` menu pages, `Settings.*` INI, `Translation.*` UI strings
+  `MenuIntegration.*` menu pages, `Settings.*` INI, `Translation.*` UI strings,
+  `SwfFont.*` SWF font parsing and rasterizing (pure), `IconFont.*` icon
+  font loading and textures, `Text.h` shared text helpers
+- `tests/` unit tests for the pure code, run by `tools\build.ps1`
 - `extern/commonlibsse-ng/` CommonLibSSE-NG submodule (alandtse/CommonLibVR `ng`)
 - `external/skse-menu-framework/` SKSE Menu Framework consumer header
 - `config/Interface/Translations/` UI translation files (generated)

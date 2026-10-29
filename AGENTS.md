@@ -63,7 +63,8 @@ mutex.
   Ninja, vcpkg via `VCPKG_ROOT`, CommonLibSSE-NG submodule
   `extern/commonlibsse-ng`; Visual Studio is found through vswhere), then
   runs `NotificationTweaksTests.exe` (`tests/Tests.cpp`: merge rules,
-  markup, hide keys, INI escaping); a failing check fails the build. This
+  markup, hide keys, INI escaping, fontconfig, SWF rasterizer, atlas
+  levels); a failing check fails the build. This
   is the local check before commit.
 - `tools\deploy.ps1 [-Register]` copies DLL, PDB and translations into the
   SkyrimAE mod `houseCARL - Notification Tweaks Dev`; `-Register` adds it to

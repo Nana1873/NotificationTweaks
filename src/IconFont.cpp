@@ -1,5 +1,6 @@
 #include "IconFont.h"
 
+#include "Markup.h"
 #include "SwfFont.h"
 #include "Text.h"
 
@@ -38,13 +39,6 @@ namespace
     bool                                                         g_configRead = false;
     NT::SwfFont::FontConfig                                      g_config;
     std::unordered_map<std::string, std::unique_ptr<LoadedFont>> g_fonts;  // lowercase face -> font, null = not available
-
-    bool IsIconFace(std::string_view a_face)
-    {
-        // The rule Markup uses for icon faces.
-        const auto lower = NT::Text::Lower(a_face);
-        return lower.find("icon") != std::string::npos || lower.find("symbol") != std::string::npos;
-    }
 
     std::vector<std::uint8_t> ReadFile(const std::string& a_path)
     {
@@ -208,9 +202,15 @@ namespace
         if (a_font.view || a_font.textureFailed) {
             return a_font.view != nullptr;
         }
+        // Failed until proven otherwise; the CPU pixels go either way.
         a_font.textureFailed = true;
+        const auto releasePixels = [&]() {
+            a_font.rgba.clear();
+            a_font.rgba.shrink_to_fit();
+        };
         auto* device = RE::BSGraphics::Renderer::GetDevice();
         if (!device || a_font.atlasHeight <= 0) {
+            releasePixels();
             return false;
         }
         REX::W32::D3D11_TEXTURE2D_DESC desc{};
@@ -226,6 +226,7 @@ namespace
         REX::W32::ID3D11Texture2D*       texture = nullptr;
         if (device->CreateTexture2D(&desc, &data, &texture) < 0 || !texture) {
             logs::error("Icon font {}: texture creation failed", a_font.face);
+            releasePixels();
             return false;
         }
         const auto result = device->CreateShaderResourceView(texture, nullptr, &a_font.view);
@@ -233,11 +234,11 @@ namespace
         if (result < 0 || !a_font.view) {
             a_font.view = nullptr;
             logs::error("Icon font {}: shader resource view failed", a_font.face);
+            releasePixels();
             return false;
         }
         a_font.textureFailed = false;
-        a_font.rgba.clear();
-        a_font.rgba.shrink_to_fit();
+        releasePixels();
         return true;
     }
 }
@@ -247,9 +248,9 @@ namespace NT::IconFont
     void Preload()
     {
         std::scoped_lock lock{ g_lock };
-        const auto       maps = Config().maps;
+        const auto&      maps = Config().maps;
         for (const auto& [alias, name] : maps) {
-            if (IsIconFace(alias)) {
+            if (NT::Markup::IsIconFace(alias)) {
                 Font(alias);
             }
         }
@@ -273,11 +274,7 @@ namespace NT::IconFont
         if (it == font->glyphs.end() || !CreateTexture(*font)) {
             return std::nullopt;
         }
-        // The smallest level still at least as tall as the line.
-        std::size_t level = 0;
-        while (level + 1 < std::size(kLevels) && kLevels[level + 1] >= a_pixelHeight) {
-            ++level;
-        }
+        const auto level = NT::SwfFont::PickLevel(kLevels, a_pixelHeight);
         const auto& glyph = it->second;
         const float w = kAtlasWidth;
         const float h = static_cast<float>(font->atlasHeight);
@@ -293,9 +290,9 @@ namespace NT::IconFont
     {
         std::scoped_lock                                 lock{ g_lock };
         std::vector<std::pair<std::string, std::size_t>> found;
-        const auto                                       maps = Config().maps;
+        const auto&                                      maps = Config().maps;
         for (const auto& [alias, name] : maps) {
-            if (!IsIconFace(alias)) {
+            if (!NT::Markup::IsIconFace(alias)) {
                 continue;
             }
             if (const auto* font = Font(alias); font && !font->textureFailed) {

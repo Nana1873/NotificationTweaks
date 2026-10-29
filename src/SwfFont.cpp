@@ -1,9 +1,16 @@
 #include "SwfFont.h"
 
+#include "Text.h"
+
 #include <zlib.h>
 
 namespace
 {
+    constexpr std::uint16_t kTagEnd = 0;
+    constexpr std::uint16_t kTagDefineFont2 = 48;
+    constexpr std::uint16_t kTagDefineFont3 = 75;
+    constexpr std::uint32_t kMaxInflated = 64U * 1024 * 1024;  // far above any game font library
+
     // SWF bit fields are packed MSB first.
     class BitReader
     {
@@ -64,13 +71,6 @@ namespace
         return a_pos + 4 <= a_data.size() ?
                    static_cast<std::uint32_t>(a_data[a_pos] | (a_data[a_pos + 1] << 8) | (a_data[a_pos + 2] << 16) | (a_data[a_pos + 3] << 24)) :
                    0;
-    }
-
-    std::string Lower(std::string_view a_text)
-    {
-        std::string out(a_text);
-        std::ranges::transform(out, out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return out;
     }
 
     // The text between the next pair of double quotes after a_pos.
@@ -182,7 +182,7 @@ namespace
         }
         std::string name(reinterpret_cast<const char*>(a_tag.data() + 5), nameLen);
         name.erase(std::ranges::find(name, '\0'), name.end());
-        if (Lower(name) != Lower(a_wanted)) {
+        if (NT::Text::LowerAscii(name) != NT::Text::LowerAscii(a_wanted)) {
             return std::nullopt;
         }
 
@@ -243,8 +243,8 @@ namespace
             }
         }
         if (font.ascent + font.descent <= 0.0F) {
-            font.ascent = 0.8F;
-            font.descent = 0.2F;
+            font.ascent = NT::SwfFont::Font{}.ascent;
+            font.descent = NT::SwfFont::Font{}.descent;
         }
         return font;
     }
@@ -266,7 +266,7 @@ namespace NT::SwfFont
             while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
                 line.remove_prefix(1);
             }
-            const auto  lower = Lower(line.substr(0, 8));
+            const auto  lower = NT::Text::LowerAscii(line.substr(0, 8));
             std::size_t pos = 0;
             if (lower.starts_with("fontlib")) {
                 if (auto lib = Quoted(line, pos)) {
@@ -292,7 +292,7 @@ namespace NT::SwfFont
         std::span<const std::uint8_t> body = a_swf.subspan(8);
         if (a_swf[0] == 'C') {
             const auto length = U32(a_swf, 4);
-            if (length < 8 || length > 64U * 1024 * 1024) {
+            if (length < 8 || length > kMaxInflated) {
                 return std::nullopt;
             }
             inflated.resize(length - 8);
@@ -319,11 +319,11 @@ namespace NT::SwfFont
                 length = U32(body, pos);
                 pos += 4;
             }
-            if (code == 0 || pos + length > body.size()) {
+            if (code == kTagEnd || pos + length > body.size()) {
                 break;
             }
-            if (code == 48 || code == 75) {
-                if (auto font = ReadDefineFont(body.subspan(pos, length), code == 75, a_name)) {
+            if (code == kTagDefineFont2 || code == kTagDefineFont3) {
+                if (auto font = ReadDefineFont(body.subspan(pos, length), code == kTagDefineFont3, a_name)) {
                     return font;
                 }
             }
@@ -374,5 +374,14 @@ namespace NT::SwfFont
             }
         }
         return out;
+    }
+
+    std::size_t PickLevel(std::span<const int> a_heights, float a_pixelHeight)
+    {
+        std::size_t level = 0;
+        while (level + 1 < a_heights.size() && static_cast<float>(a_heights[level + 1]) >= a_pixelHeight) {
+            ++level;
+        }
+        return level;
     }
 }

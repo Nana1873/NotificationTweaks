@@ -74,7 +74,7 @@ STRINGS = [
     ("drawIconFonts", "Draw icon fonts (e.g. Oblivion Interaction Icons)", "Icon-Fonts zeichnen (z. B. Oblivion Interaction Icons)"),
     ("drawIconFontsTip", "Some mods put icons from their own font into messages, like the OII save icon. On: the plugin reads that font and draws the icons with the lines. Off: icons are left out; a message that is only an icon goes to the Vanilla HUD.", "Manche Mods setzen Icons aus ihrem eigenen Font in Meldungen, etwa das Speichern-Icon von OII. An: Das Plugin liest diesen Font und zeichnet die Icons mit den Zeilen. Aus: Icons fallen weg; eine Meldung, die nur aus einem Icon besteht, geht an das Vanilla-HUD."),
     ("iconFontsFound", "Icon fonts found:", "Gefundene Icon-Fonts:"),
-    ("iconFontsNone", "No icon font installed.", "Kein Icon-Font installiert."),
+    ("iconFontsNone", "No icon font found.", "Kein Icon-Font gefunden."),
     ("iconFontGlyphs", "icons", "Icons"),
     ("historyIconOnly", "(icon)", "(Icon)"),
     ("testYps", "Test YPS split", "YPS-Teilung testen"),

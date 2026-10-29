@@ -143,8 +143,8 @@ namespace NT
         s.drawIconFonts = ReadBool("Compatibility", "DrawIconFonts", d.drawIconFonts, path);
 
         PublishCapture();
-        logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {})", path,
-            s.enabled, s.posX, s.posY, s.immediate, s.mergeYps, s.mergeBos, s.mergeGeneric);
+        logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {}, icon fonts {})",
+            path, s.enabled, s.posX, s.posY, s.immediate, s.mergeYps, s.mergeBos, s.mergeGeneric, s.drawIconFonts);
     }
 
     void SaveSettings()

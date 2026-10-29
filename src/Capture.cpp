@@ -84,24 +84,27 @@ namespace
         return nullptr;
     }
 
-    // The Vanilla text field translates a lone "$Key" through the Scaleform
-    // translator; keep that (unknown keys stay as sent). Empty when a_raw is
-    // no key.
-    std::string TranslateKey(std::string_view a_raw)
+    // The text as the Vanilla text field would show it: a lone "$Key" goes
+    // through the Scaleform translator (unknown keys stay as sent).
+    std::string Resolve(std::string_view a_raw)
     {
         if (a_raw.size() > 1 && a_raw.front() == '$' && a_raw.find(' ') == std::string_view::npos) {
             return NT::Translation::Translate(a_raw, a_raw);
         }
-        return {};
+        return std::string(a_raw);
     }
 
-    // Vanilla display (plugin switched off): the history still records.
+    // A line the Vanilla HUD shows: the history still records it.
+    void RecordResolved(std::string_view a_resolved)
+    {
+        std::scoped_lock lock{ g_lock };
+        AddHistory(g_nextID++, a_resolved);
+    }
+
+    // Plugin switched off.
     void RecordOnly(std::string_view a_raw)
     {
-        const auto       translated = TranslateKey(a_raw);
-        const auto       raw = translated.empty() ? a_raw : std::string_view{ translated };
-        std::scoped_lock lock{ g_lock };
-        AddHistory(g_nextID++, raw);
+        RecordResolved(Resolve(a_raw));
     }
 
     const char* RuleName(NT::Merge::Rule a_rule)
@@ -121,24 +124,32 @@ namespace
     // False for a line with nothing the overlay can draw: no text and no
     // icon IconFont knows (icon fonts off, or the font is missing). Those
     // stay with the Vanilla HUD, which renders the icon font itself.
-    bool Drawable(std::string_view a_raw)
+    bool DrawableResolved(std::string_view a_resolved)
     {
-        const auto             translated = TranslateKey(a_raw);
-        const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
-        if (!NT::Markup::Visible(raw).empty()) {
+        if (!NT::Markup::Visible(a_resolved).empty()) {
             return true;
         }
         if (!NT::CaptureConfig().drawIconFonts) {
             return false;
         }
-        for (const auto& run : NT::Markup::Parse(raw)) {
-            for (std::size_t i = 0; !run.iconFace.empty() && i < run.text.size();) {
-                if (const auto code = NT::Text::NextCodePoint(run.text, i); code != U' ' && NT::IconFont::Has(run.iconFace, code)) {
+        for (const auto& run : NT::Markup::Parse(a_resolved)) {
+            if (run.iconFace.empty()) {
+                continue;
+            }
+            for (std::size_t i = 0; i < run.text.size();) {
+                // Whitespace is spacing, as in Overlay's Layout.
+                const auto code = NT::Text::NextCodePoint(run.text, i);
+                if (code != U' ' && code != U'\t' && NT::IconFont::Has(run.iconFace, code)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    bool Drawable(std::string_view a_raw)
+    {
+        return DrawableResolved(Resolve(a_raw));
     }
 
     NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw, const NT::CaptureSettings& a_settings)
@@ -239,12 +250,12 @@ namespace NT::Capture
 
     bool Push(std::string_view a_raw)
     {
-        if (!Drawable(a_raw)) {
-            RecordOnly(a_raw);  // the Vanilla HUD shows it; the history still lists it
+        const auto             resolved = Resolve(a_raw);
+        const std::string_view raw = resolved;
+        if (!DrawableResolved(raw)) {
+            RecordResolved(raw);  // the Vanilla HUD shows it; the history still lists it
             return false;
         }
-        const auto             translated = TranslateKey(a_raw);
-        const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
 
         const auto s = CaptureConfig();
         const auto  now = std::chrono::steady_clock::now();
