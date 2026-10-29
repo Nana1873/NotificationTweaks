@@ -3,8 +3,8 @@
 // The small HTML subset the Vanilla notification text field renders
 // (Scaleform htmlText): <font color="#RRGGBB">, <br>, entities. Everything
 // else is dropped as a tag. Text inside <font face="..."> of an icon font
-// (name contains "icon" or "symbol") is dropped too: the overlay would
-// draw the letter the icon is mapped to.
+// (name contains "icon" or "symbol") becomes runs with iconFace set: its
+// letters stand for pictures (IconFont draws them), not for text.
 namespace NT::Markup
 {
     struct Run
@@ -12,6 +12,7 @@ namespace NT::Markup
         std::string                  text;  // UTF-8
         std::optional<std::uint32_t> rgb;   // 0xRRGGBB from <font color>, nullopt = default color
         bool                         lineBreak = false;  // <br> / '\n' before this run
+        std::string                  iconFace;           // "$Iconographia": text is icon-font glyphs
     };
 
     // Notification text arrives in whatever encoding the sender used:
@@ -21,7 +22,7 @@ namespace NT::Markup
 
     std::vector<Run> Parse(std::string_view a_raw);
 
-    // Tag-free text (entities decoded, icon glyphs dropped, trimmed): merge
+    // Tag-free text (entities decoded, icon glyphs left out, trimmed): merge
     // heuristics, history and hide keys.
     std::string Visible(std::string_view a_raw);
 

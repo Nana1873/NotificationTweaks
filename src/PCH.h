@@ -14,6 +14,7 @@
 #include <fstream>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>

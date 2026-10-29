@@ -43,9 +43,9 @@ namespace NT::Capture
     void Install();
 
     // Main thread: a notification the HUD would have shown. False when the
-    // line has nothing the overlay can draw (only icon-font glyphs); the
-    // caller then leaves it to the Vanilla HUD, or drops it when
-    // HideIconOnly is on.
+    // line has nothing the overlay can draw (only icons of a font IconFont
+    // cannot load, or icon fonts switched off); the caller then leaves it
+    // to the Vanilla HUD.
     bool Push(std::string_view a_raw);
 
     // Render thread (overlay): exclusive access to the live entries, oldest first.

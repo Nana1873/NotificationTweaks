@@ -28,11 +28,13 @@ plugins put in the top left corner) and draws them itself through
   notifications (YPS and BoS thoughts, optional generic rule).
 - Identical repeats stack as "(x2)". `$Key` notifications are translated
   like Vanilla does. Quest, skill and level messages stay Vanilla.
-- Icon fonts (e.g. Oblivion Interaction Icons' `$Iconographia`) cannot be
-  drawn by the overlay; their glyphs are left out instead of showing the
-  letter they are mapped to. A line that is only icons goes to the Vanilla
-  HUD, which draws the real icon, or is hidden with the Compatibility
-  option "Hide icon-only messages" (`HideIconOnly`).
+- Icon fonts (e.g. Oblivion Interaction Icons' `$Iconographia`): the
+  plugin reads the font library `Interface/fontconfig.txt` maps the face
+  to (OII's `Fonticon.swf`, from your own install) and draws the real
+  icons with the lines. Nothing is loaded unless a message uses such a
+  font. With "Draw icon fonts" off (`DrawIconFonts=0`), or when the font
+  cannot be read, icons are left out and an icon-only line goes to the
+  Vanilla HUD.
 - Save-neutral: nothing is written to the save. Settings live in
   `Data/SKSE/Plugins/NotificationTweaks.ini`. Two keys exist only there:
   `[General] VerboseLog=1` logs every notification and merge, and

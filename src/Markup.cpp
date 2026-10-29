@@ -125,17 +125,19 @@ namespace NT::Markup
         std::vector<Run>                           runs;
         std::vector<std::optional<std::uint32_t>> colors{ std::nullopt };
         std::vector<bool>                          fontPushedColor;  // per open <font>: did it push a color?
-        std::vector<bool>                          iconFont{ false };  // per open <font>: inside an icon font?
+        std::vector<std::string>                   iconFaces{ {} };  // per open <font>: its icon face, empty for text
         Run                                        current;
 
         const auto flush = [&]() {
             if (current.text.empty()) {
                 current.rgb = colors.back();  // keep a pending lineBreak
+                current.iconFace = iconFaces.back();
                 return;
             }
             runs.push_back(std::move(current));
             current = Run{};
             current.rgb = colors.back();
+            current.iconFace = iconFaces.back();
         };
         current.rgb = colors.back();
 
@@ -158,8 +160,9 @@ namespace NT::Markup
                     if (rgb) {
                         colors.push_back(rgb);
                     }
-                    iconFont.push_back(face ? IsIconFace(*face) : iconFont.back());
+                    iconFaces.push_back(face ? (IsIconFace(*face) ? *face : std::string{}) : iconFaces.back());
                     current.rgb = colors.back();
+                    current.iconFace = iconFaces.back();
                 } else if (lower.starts_with("/font")) {
                     flush();
                     if (!fontPushedColor.empty()) {
@@ -168,17 +171,16 @@ namespace NT::Markup
                         }
                         fontPushedColor.pop_back();
                     }
-                    if (iconFont.size() > 1) {
-                        iconFont.pop_back();
+                    if (iconFaces.size() > 1) {
+                        iconFaces.pop_back();
                     }
                     current.rgb = colors.back();
+                    current.iconFace = iconFaces.back();
                 } else if (lower.starts_with("br") || lower.starts_with("/p")) {
                     flush();
                     current.lineBreak = true;
                 }
                 i = end;
-            } else if (iconFont.back()) {
-                continue;  // a glyph of an icon font: its letter would show instead of the icon
             } else if (c == '&') {
                 const auto end = text.find(';', i);
                 if (end != std::string::npos && end - i <= 10) {
@@ -207,9 +209,11 @@ namespace NT::Markup
             if (run.lineBreak && !out.empty()) {
                 out += ' ';
             }
-            out += run.text;
+            if (run.iconFace.empty()) {
+                out += run.text;  // icon glyphs are letters only in their own font
+            }
         }
-        // A dropped icon leaves the space that followed it.
+        // A skipped icon leaves the space that followed it.
         return std::string(NT::Text::Trim(out));
     }
 

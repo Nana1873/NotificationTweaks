@@ -4,6 +4,7 @@
 
 #include "Markup.h"
 #include "Merge.h"
+#include "SwfFont.h"
 #include "Text.h"
 
 namespace
@@ -52,6 +53,13 @@ namespace
         std::string utf8;
         AppendUtf8(0x1F600, utf8);
         CHECK(utf8 == "\xF0\x9F\x98\x80");
+
+        std::size_t       pos = 0;
+        const std::string mixed = "w\xC3\xA4\xF0\x9F\x98\x80\xC3";
+        CHECK(NextCodePoint(mixed, pos) == U'w');
+        CHECK(NextCodePoint(mixed, pos) == U'ä');
+        CHECK(NextCodePoint(mixed, pos) == U'\U0001F600');
+        CHECK(NextCodePoint(mixed, pos) == U'�' && pos == mixed.size());
     }
 
     void TestMarkup()
@@ -77,6 +85,8 @@ namespace
         CHECK(Visible("<font face=\"$Iconographia\"><font color=\"#FF0000\">W</font></font> x") == "x");
         CHECK(Visible("<font face=\"$EverywhereFont\">Normal</font>") == "Normal");
         CHECK(Visible("<font face=\"$Iconographia\">W</font> Saving") == Visible("Saving"));
+        const auto iconRuns = Parse("<font face='$Iconographia'> w </font>Saved");
+        CHECK(iconRuns.size() == 2 && iconRuns[0].iconFace == "$Iconographia" && iconRuns[0].text == " w " && iconRuns[1].iconFace.empty());
 
         const auto runs = Parse("a <font color=\"#112233\">b</font> c");
         CHECK(runs.size() == 3);
@@ -115,6 +125,59 @@ namespace
         CHECK(Join(pink("a"), pink("b")) == pink("a b"));
         CHECK(Join(" left ", " right ") == "left right");
     }
+
+    void TestSwfFont()
+    {
+        using namespace NT::SwfFont;
+        const auto config = ParseFontConfig(
+            "fontlib \"Interface\\fonts_en.swf\"\r\n  fontlib \"Interface\\Fonticon.swf\"\r\n"
+            "map \"$EverywhereFont\" = \"Futura Condensed\" Normal\r\nmap \"$Iconographia\" = \"Iconographia\" Normal\r\n");
+        CHECK(config.libs.size() == 2 && config.libs[1] == "Interface\\Fonticon.swf");
+        CHECK(config.maps.size() == 2 && config.maps[1].first == "$Iconographia" && config.maps[1].second == "Iconographia");
+
+        // A 4x4 square at (2,2) in a 8x8 bitmap: full inside, empty outside,
+        // half coverage on a half-pixel edge.
+        const std::vector<std::vector<Point>> square{ { { 2, 2 }, { 6, 2 }, { 6, 6 }, { 2, 6 } } };
+        const auto                            full = Rasterize(square, 8, 8, 1.0F, 0.0F, 0.0F);
+        CHECK(full[3 * 8 + 3] == 255 && full[0] == 0 && full[7 * 8 + 7] == 0);
+        const auto half = Rasterize(square, 8, 8, 1.0F, 0.5F, 0.0F);
+        CHECK(half[3 * 8 + 2] > 100 && half[3 * 8 + 2] < 160);
+        // Even-odd: a square hole inside a square stays empty.
+        const std::vector<std::vector<Point>> ring{ { { 0, 0 }, { 8, 0 }, { 8, 8 }, { 0, 8 } }, { { 3, 3 }, { 5, 3 }, { 5, 5 }, { 3, 5 } } };
+        const auto                            hole = Rasterize(ring, 8, 8, 1.0F, 0.0F, 0.0F);
+        CHECK(hole[4 * 8 + 4] == 0 && hole[1 * 8 + 1] == 255);
+
+        CHECK(!Load(std::span<const std::uint8_t>{}, "x"));
+
+        // Optional: a real font library, e.g. NT_TEST_SWF=...\Fonticon.swf
+        // NT_TEST_FONT=Iconographia; writes the "w" glyph as glyph_w.pgm.
+        char swfPath[512]{};
+        char fontName[128]{};
+        if (GetEnvironmentVariableA("NT_TEST_SWF", swfPath, sizeof(swfPath)) && GetEnvironmentVariableA("NT_TEST_FONT", fontName, sizeof(fontName))) {
+            std::ifstream                   file(swfPath, std::ios::binary);
+            const std::vector<std::uint8_t> data{ std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
+            const auto                      font = Load(data, fontName);
+            CHECK(font.has_value());
+            if (font) {
+                std::cout << std::format("[swf] {}: {} glyphs, ascent {:.3f}, descent {:.3f}\n", font->name, font->glyphs.size(), font->ascent,
+                    font->descent);
+                for (const auto& glyph : font->glyphs) {
+                    if (glyph.code != U'w') {
+                        continue;
+                    }
+                    constexpr int kHeight = 64;
+                    const float   scale = kHeight / (font->ascent + font->descent);
+                    const int     width = std::max(1, static_cast<int>(std::ceil(glyph.advance * scale)));
+                    const auto    bitmap = Rasterize(glyph.contours, width, kHeight, scale, 0.0F, font->ascent * scale);
+                    std::ofstream pgm("glyph_w.pgm", std::ios::binary);
+                    pgm << "P5\n" << width << " " << kHeight << "\n255\n";
+                    pgm.write(reinterpret_cast<const char*>(bitmap.data()), static_cast<std::streamsize>(bitmap.size()));
+                    std::cout << std::format("[swf] glyph w: advance {:.3f}, {} contours, written {}x{}\n", glyph.advance, glyph.contours.size(),
+                        width, kHeight);
+                }
+            }
+        }
+    }
 }
 
 int main()
@@ -123,6 +186,7 @@ int main()
     TestText();
     TestMarkup();
     TestMerge();
+    TestSwfFont();
     std::cout << std::format("[tests] {} passed, {} failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

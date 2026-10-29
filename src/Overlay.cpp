@@ -1,8 +1,10 @@
 #include "Overlay.h"
 
 #include "Capture.h"
+#include "IconFont.h"
 #include "SKSEMenuFramework.h"
 #include "Settings.h"
+#include "Text.h"
 #include "Translation.h"
 
 namespace
@@ -19,10 +21,12 @@ namespace
 
     struct Piece
     {
-        std::string   text;
-        std::uint32_t rgb = 0;
-        bool          defaultColor = true;
-        float         x = 0.0F;
+        std::string                                text;
+        std::optional<NT::IconFont::GlyphImage>    icon;  // drawn instead of text
+        std::uint32_t                              rgb = 0;
+        bool                                       defaultColor = true;
+        float                                      x = 0.0F;
+        float                                      width = 0.0F;
     };
 
     struct Line
@@ -58,15 +62,17 @@ namespace
     }
 
     // Word wrap over colored runs. A word longer than the line still gets
-    // a line of its own rather than being cut.
-    std::vector<Line> Layout(const std::vector<NT::Markup::Run>& a_runs, int a_count, ImGuiMCP::ImFont* a_font, float a_size, float a_maxWidth)
+    // a line of its own rather than being cut. Icon-font runs become one
+    // piece per glyph when a_icons is on and IconFont knows the glyph.
+    std::vector<Line> Layout(const std::vector<NT::Markup::Run>& a_runs, int a_count, ImGuiMCP::ImFont* a_font, float a_size, float a_maxWidth,
+        bool a_icons)
     {
         std::vector<Line> lines(1);
         const float       space = Measure(a_font, a_size, " ");
         bool              pendingSpace = false;
 
-        const auto place = [&](std::string_view a_word, const NT::Markup::Run* a_run) {
-            const float width = Measure(a_font, a_size, a_word);
+        const auto place = [&](std::string_view a_word, const NT::Markup::Run* a_run, std::optional<NT::IconFont::GlyphImage> a_icon = std::nullopt) {
+            const float width = a_icon ? a_icon->aspect * a_size : Measure(a_font, a_size, a_word);
             auto*       line = &lines.back();
             const float gap = (pendingSpace && !line->pieces.empty()) ? space : 0.0F;
             if (!line->pieces.empty() && line->width + gap + width > a_maxWidth) {
@@ -76,7 +82,9 @@ namespace
             const float x = line->pieces.empty() ? 0.0F : line->width + gap;
             Piece       piece;
             piece.text = std::string(a_word);
+            piece.icon = a_icon;
             piece.x = x;
+            piece.width = width;
             if (a_run && a_run->rgb) {
                 piece.rgb = *a_run->rgb;
                 piece.defaultColor = false;
@@ -93,6 +101,17 @@ namespace
             }
             std::size_t i = 0;
             const auto& text = run.text;
+            if (!run.iconFace.empty()) {
+                while (i < text.size()) {
+                    const auto code = NT::Text::NextCodePoint(text, i);
+                    if (code == U' ' || code == U'\t') {
+                        pendingSpace = true;
+                    } else if (auto icon = a_icons ? NT::IconFont::Get(run.iconFace, code, a_size) : std::nullopt) {
+                        place({}, &run, icon);
+                    }
+                }
+                continue;
+            }
             while (i < text.size()) {
                 if (text[i] == ' ' || text[i] == '\t') {
                     pendingSpace = true;
@@ -219,14 +238,24 @@ namespace
         const char* end = begin + a_piece.text.size();
         const auto  shadow = ImGuiMCP::ColorConvertFloat4ToU32({ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha * a_settings.textColor[3] });
         const float o = std::max(1.0F, a_size / 18.0F);
+        // Icons: the white glyph image tinted like text, its box one line high.
+        const auto draw = [&](float a_dx, float a_dy, ImGuiMCP::ImU32 a_color) {
+            const ImVec2 pos{ a_pos.x + a_dx, a_pos.y + a_dy };
+            if (a_piece.icon) {
+                ImGuiMCP::ImDrawListManager::AddImage(a_list, a_piece.icon->texture, pos, { pos.x + a_piece.width, pos.y + a_size },
+                    a_piece.icon->uv0, a_piece.icon->uv1, a_color);
+            } else {
+                ImGuiMCP::ImDrawListManager::AddText(a_list, a_font, a_size, pos, a_color, begin, end);
+            }
+        };
         if (a_settings.effect == NT::TextEffect::kShadow) {
-            ImGuiMCP::ImDrawListManager::AddText(a_list, a_font, a_size, { a_pos.x + o, a_pos.y + o }, shadow, begin, end);
+            draw(o, o, shadow);
         } else if (a_settings.effect == NT::TextEffect::kOutline) {
             for (const auto& [dx, dy] : { std::pair{ -o, 0.0F }, { o, 0.0F }, { 0.0F, -o }, { 0.0F, o }, { -o, -o }, { o, o }, { -o, o }, { o, -o } }) {
-                ImGuiMCP::ImDrawListManager::AddText(a_list, a_font, a_size, { a_pos.x + dx, a_pos.y + dy }, shadow, begin, end);
+                draw(dx, dy, shadow);
             }
         }
-        ImGuiMCP::ImDrawListManager::AddText(a_list, a_font, a_size, a_pos, Color(a_piece, a_settings, a_alpha), begin, end);
+        draw(0.0F, 0.0F, Color(a_piece, a_settings, a_alpha));
     }
 
     struct Block
@@ -267,11 +296,11 @@ namespace
         if (a_positioning && a_entries.empty()) {
             const auto& strings = NT::Translation::S();
             for (const auto* sample : { &strings.sample1, &strings.sample2, &strings.sample3 }) {
-                blocks.push_back({ Layout(NT::Markup::Parse(*sample), 1, a_metrics.font, a_metrics.size, a_metrics.maxWidth), 1.0F });
+                blocks.push_back({ Layout(NT::Markup::Parse(*sample), 1, a_metrics.font, a_metrics.size, a_metrics.maxWidth, false), 1.0F });
             }
         } else {
             for (const auto& entry : a_entries) {
-                blocks.push_back({ Layout(entry.runs, entry.count, a_metrics.font, a_metrics.size, a_metrics.maxWidth), Alpha(entry, a_settings) });
+                blocks.push_back({ Layout(entry.runs, entry.count, a_metrics.font, a_metrics.size, a_metrics.maxWidth, a_settings.drawIconFonts), Alpha(entry, a_settings) });
             }
         }
         if (a_settings.newestOnTop) {

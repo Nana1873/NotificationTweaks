@@ -1,6 +1,7 @@
 #include "MenuIntegration.h"
 
 #include "Capture.h"
+#include "IconFont.h"
 #include "Merge.h"
 #include "Overlay.h"
 #include "SKSEMenuFramework.h"
@@ -262,8 +263,19 @@ namespace
         Tooltip(t.mergeBosTip);
         Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
         Tooltip(t.mergeGenericTip);
-        Commit(ImGuiMCP::Checkbox((t.hideIconOnly + "##iconsonly").c_str(), &s.hideIconOnly));
-        Tooltip(t.hideIconOnlyTip);
+        Commit(ImGuiMCP::Checkbox((t.drawIconFonts + "##iconfonts").c_str(), &s.drawIconFonts));
+        Tooltip(t.drawIconFontsTip);
+        if (s.drawIconFonts) {
+            // Reads fontconfig.txt and the icon fonts once; cached afterwards.
+            const auto found = NT::IconFont::Found();
+            if (found.empty()) {
+                ImGuiMCP::TextDisabled("    %s", t.iconFontsNone.c_str());
+            } else {
+                for (const auto& [face, glyphs] : found) {
+                    ImGuiMCP::TextDisabled("    %s %s (%zu %s)", t.iconFontsFound.c_str(), face.c_str(), glyphs, t.iconFontGlyphs.c_str());
+                }
+            }
+        }
         SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
 
         ImGuiMCP::SeparatorText(t.headTest.c_str());
@@ -350,6 +362,10 @@ namespace
                     continue;
                 }
                 any = true;
+                if (it->text.empty()) {  // only icons: nothing to read or hide by
+                    ImGuiMCP::TextDisabled("%s  %s", LocalTime(it->time).c_str(), t.historyIconOnly.c_str());
+                    continue;
+                }
                 const auto key = NT::Text::HideKey(it->text);
                 const bool isHidden = hidden.contains(key);
                 HideToggle(key, isHidden, it->id);

@@ -71,6 +71,24 @@ namespace NT::Text
         }
     }
 
+    // The code point at a_pos (advanced past it); U+FFFD for a broken sequence.
+    inline char32_t NextCodePoint(std::string_view a_text, std::size_t& a_pos)
+    {
+        const auto byte = static_cast<unsigned char>(a_text[a_pos++]);
+        const int  extra = byte < 0x80 ? 0 : (byte >> 5) == 0x06 ? 1 : (byte >> 4) == 0x0E ? 2 : (byte >> 3) == 0x1E ? 3 : -1;
+        if (extra < 0) {
+            return U'�';
+        }
+        char32_t code = extra == 0 ? byte : byte & (0x3F >> extra);
+        for (int i = 0; i < extra; ++i) {
+            if (a_pos >= a_text.size() || (static_cast<unsigned char>(a_text[a_pos]) & 0xC0) != 0x80) {
+                return U'�';
+            }
+            code = (code << 6) | (static_cast<unsigned char>(a_text[a_pos++]) & 0x3F);
+        }
+        return code;
+    }
+
     // The hide key of a visible line: every run of ASCII digits becomes "#",
     // so "25 Gold added" and "30 Gold added" share one key. ASCII only:
     // std::isdigit depends on the CRT locale and can match UTF-8

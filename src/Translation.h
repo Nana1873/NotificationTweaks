@@ -75,8 +75,12 @@ namespace NT::Translation
         std::string mergeGeneric = "All mods: merge obvious continuations";
         std::string mergeGenericTip = "First line without a sentence end, second line starts lowercase. Can also join unrelated messages.";
         std::string mergeWindow = "Max. gap between halves";
-        std::string hideIconOnly = "Hide icon-only messages (e.g. Oblivion Interaction Icons)";
-        std::string hideIconOnlyTip = "Some mods send messages that are only an icon from their own font, like the OII save icon. The plugin cannot draw that font. Off: the Vanilla HUD shows these icons at its own position. On: they are not shown. Text with an icon always shows without the icon.";
+        std::string drawIconFonts = "Draw icon fonts (e.g. Oblivion Interaction Icons)";
+        std::string drawIconFontsTip = "Some mods put icons from their own font into messages, like the OII save icon. On: the plugin reads that font and draws the icons with the lines. Off: icons are left out; a message that is only an icon goes to the Vanilla HUD.";
+        std::string iconFontsFound = "Icon fonts found:";
+        std::string iconFontsNone = "No icon font installed.";
+        std::string iconFontGlyphs = "icons";
+        std::string historyIconOnly = "(icon)";
         std::string testYps = "Test YPS split";
         std::string testBos = "Test BoS split";
         std::string sample1 = "Notification Tweaks: sample line";

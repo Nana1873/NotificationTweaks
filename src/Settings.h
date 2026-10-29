@@ -88,7 +88,7 @@ namespace NT
         bool  mergeGeneric = false; // any two lines: no sentence end + lowercase continuation
         float mergeWindow = 0.35F;  // seconds the second half may arrive after the first
         int   ypsLimit = 80;        // YPS LongThoughtLimit (MCM); only longer thoughts are split
-        bool  hideIconOnly = false; // lines that are only icon-font glyphs (Oblivion Interaction Icons): hide instead of Vanilla
+        bool  drawIconFonts = true; // draw icon-font glyphs (Oblivion Interaction Icons) from the mod's own font library
     };
 
     // The values the game thread reads while capturing. The menu and the
@@ -106,7 +106,7 @@ namespace NT
         float visibleTime = 4.15F;  // fadeIn + duration: how long a line counts for stacking
         float fadeIn = 0.15F;
         int   ypsLimit = 80;
-        bool  hideIconOnly = false;
+        bool  drawIconFonts = true;
     };
 
     // Render thread (menu, overlay) and startup: the full settings.

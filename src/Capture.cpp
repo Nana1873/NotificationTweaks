@@ -1,5 +1,6 @@
 #include "Capture.h"
 
+#include "IconFont.h"
 #include "Settings.h"
 #include "Text.h"
 #include "Translation.h"
@@ -99,9 +100,6 @@ namespace
     {
         const auto       translated = TranslateKey(a_raw);
         const auto       raw = translated.empty() ? a_raw : std::string_view{ translated };
-        if (NT::Markup::Visible(raw).empty()) {
-            return;  // only icon glyphs: an empty history line would say nothing
-        }
         std::scoped_lock lock{ g_lock };
         AddHistory(g_nextID++, raw);
     }
@@ -120,13 +118,27 @@ namespace
         }
     }
 
-    // False for a line with nothing the overlay can draw, e.g. only an
-    // icon-font glyph (Oblivion Interaction Icons' save icon): those stay
-    // with the Vanilla HUD, which renders the icon font.
+    // False for a line with nothing the overlay can draw: no text and no
+    // icon IconFont knows (icon fonts off, or the font is missing). Those
+    // stay with the Vanilla HUD, which renders the icon font itself.
     bool Drawable(std::string_view a_raw)
     {
-        const auto translated = TranslateKey(a_raw);
-        return !NT::Markup::Visible(translated.empty() ? a_raw : std::string_view{ translated }).empty();
+        const auto             translated = TranslateKey(a_raw);
+        const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
+        if (!NT::Markup::Visible(raw).empty()) {
+            return true;
+        }
+        if (!NT::CaptureConfig().drawIconFonts) {
+            return false;
+        }
+        for (const auto& run : NT::Markup::Parse(raw)) {
+            for (std::size_t i = 0; !run.iconFace.empty() && i < run.text.size();) {
+                if (const auto code = NT::Text::NextCodePoint(run.text, i); code != U' ' && NT::IconFont::Has(run.iconFace, code)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw, const NT::CaptureSettings& a_settings)
@@ -164,8 +176,8 @@ namespace
                         }
                         return func(a_this, a_message);
                     }
-                    if (text && *text && !NT::Capture::Push(text) && !NT::CaptureConfig().hideIconOnly) {
-                        return func(a_this, a_message);  // only icon glyphs: Vanilla can draw them
+                    if (text && *text && !NT::Capture::Push(text)) {
+                        return func(a_this, a_message);  // icons we cannot draw: Vanilla can
                     }
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
@@ -185,9 +197,8 @@ namespace
             if (a_this && NT::CaptureEnabled()) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
-                    // Icon-only lines stay for Vanilla unless the player hides them.
-                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word &&
-                        (Drawable(it->text.c_str()) || NT::CaptureConfig().hideIconOnly)) {
+                    // Lines we cannot draw (only unknown icons) stay for Vanilla.
+                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word && Drawable(it->text.c_str())) {
                         static bool logged = false;
                         if (!logged) {
                             logged = true;
@@ -229,6 +240,7 @@ namespace NT::Capture
     bool Push(std::string_view a_raw)
     {
         if (!Drawable(a_raw)) {
+            RecordOnly(a_raw);  // the Vanilla HUD shows it; the history still lists it
             return false;
         }
         const auto             translated = TranslateKey(a_raw);

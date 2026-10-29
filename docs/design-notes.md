@@ -97,14 +97,36 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 ## Icon fonts (1.1.0)
 
 - Oblivion Interaction Icons sets GMSTs like sQuickSaving to
-  `<font face='$Iconographia'> w </font>` (font from
-  `Interface\Fonticon.swf`, mapped in fontconfig.txt). ImGui cannot draw
-  Scaleform fonts, so `Markup::Parse` drops text inside a face whose name
-  contains "icon" or "symbol" (also the vanilla `$SkyrimSymbolsFont`).
-- A line with nothing left (`Capture::Push` returns false) goes back to
-  the Vanilla HUD, which renders the icon at its own position; with
-  `HideIconOnly` it is swallowed instead. Drawing the real glyphs would
-  need a SWF font parser and rasterizer; not done.
+  `<font face='$Iconographia'> w </font>`; the face is mapped in
+  `Interface\fontconfig.txt` (`map "$Iconographia" = "Iconographia"`) to a
+  DefineFont3 in `Interface\Fonticon.swf` (CWS, zlib).
+- `Markup::Parse` keeps text inside a face whose name contains "icon" or
+  "symbol" as runs with `iconFace` set; `Visible()` leaves them out (merge
+  rules, history and hide keys see text only).
+- `SwfFont` (pure, unit-tested) parses fontconfig.txt, inflates the SWF,
+  reads DefineFont2/3 glyph shapes (curves flattened, EM units) and
+  rasterizes them even-odd. Each shape is read only within its own slice
+  of the shape table; glyph count, points per glyph and atlas height are
+  capped, and loading runs in try/catch (a bad file means no icons, never
+  a crash).
+- `IconFont::Preload` loads every icon face fontconfig.txt maps at
+  kDataLoaded (about 0.3 s with OII and the vanilla `$SkyrimSymbolsFont`
+  from fonts_en.swf), so nothing is read during play. Glyphs are packed
+  into one white RGBA atlas (alpha = coverage) at 96, 48 and 24 px; the
+  overlay samples the level closest above its line height, because the
+  menu framework's sampler has no mipmaps. The D3D11 texture is created
+  on the render thread on first draw; if that fails, `Has()` turns false
+  and such lines go back to Vanilla. Glyph boxes include outline parts
+  outside the advance. The overlay draws each glyph with `AddImage`, one
+  line high, tinted like text, with the same shadow/outline.
+- Nothing ships from OII: the font is read from the player's install.
+- A line with nothing drawable (icon fonts off via `DrawIconFonts`, or
+  the font missing) makes `Capture::Push` return false and goes back to
+  the Vanilla HUD, which renders the icon itself; it is still recorded in
+  the history (shown as "(icon)" without an eye).
+- Verified in game (AE 1.7.104, OII DSD 2.60): 60 drawable glyphs; save
+  and load icons, colored icons and icon + text render at the overlay's
+  position.
 
 ## Hiding (1.1.0)
 

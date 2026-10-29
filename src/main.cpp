@@ -1,4 +1,5 @@
 #include "Capture.h"
+#include "IconFont.h"
 #include "Merge.h"
 #include "MenuIntegration.h"
 #include "Overlay.h"
@@ -56,6 +57,9 @@ namespace
         NT::Translation::Import("NotificationTweaks");
         NT::Translation::LoadStrings();
         NT::Capture::LoadHidden();
+        if (NT::Config().drawIconFonts) {
+            NT::IconFont::Preload();  // during the loading screen, not mid-game
+        }
         NT::Capture::Install();
         NT::Overlay::Initialize();
         NT::MenuIntegration::Initialize();

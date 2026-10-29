@@ -21,7 +21,12 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/Overlay.cpp
         src/MenuIntegration.cpp
         src/Translation.cpp
+        src/SwfFont.cpp
+        src/IconFont.cpp
 )
+
+find_package(ZLIB REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE ZLIB::ZLIB)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE /Zc:preprocessor /permissive- /W4 /utf-8)
@@ -31,7 +36,8 @@ target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE external/skse-menu-fra
 target_precompile_headers(${PROJECT_NAME} PRIVATE src/PCH.h)
 
 # Unit tests for the pure modules (no CommonLibSSE); tools\build.ps1 runs them.
-add_executable(NotificationTweaksTests tests/Tests.cpp src/Merge.cpp src/Markup.cpp)
+add_executable(NotificationTweaksTests tests/Tests.cpp src/Merge.cpp src/Markup.cpp src/SwfFont.cpp)
+target_link_libraries(NotificationTweaksTests PRIVATE ZLIB::ZLIB)
 target_compile_features(NotificationTweaksTests PRIVATE cxx_std_23)
 target_compile_options(NotificationTweaksTests PRIVATE /Zc:preprocessor /permissive- /W4 /utf-8)
 target_compile_definitions(NotificationTweaksTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
