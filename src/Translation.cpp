@@ -191,6 +191,9 @@ namespace NT::Translation
         g_strings.historyFilter = Translate("$NT_HistoryFilter", defaults.historyFilter);
         g_strings.historyClear = Translate("$NT_HistoryClear", defaults.historyClear);
         g_strings.historyEmpty = Translate("$NT_HistoryEmpty", defaults.historyEmpty);
+        g_strings.historyHide = Translate("$NT_HistoryHide", defaults.historyHide);
+        g_strings.historyUnhide = Translate("$NT_HistoryUnhide", defaults.historyUnhide);
+        g_strings.historyShowAll = Translate("$NT_HistoryShowAll", defaults.historyShowAll);
         g_strings.headAdvanced = Translate("$NT_HeadAdvanced", defaults.headAdvanced);
         g_strings.enabled = Translate("$NT_Enabled", defaults.enabled);
         g_strings.enabledTip = Translate("$NT_EnabledTip", defaults.enabledTip);

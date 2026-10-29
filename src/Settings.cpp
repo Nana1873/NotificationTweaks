@@ -39,7 +39,7 @@ namespace
 
     std::string ReadString(const char* a_section, const char* a_key, const std::string& a_default, const std::string& a_path)
     {
-        char buf[512]{};
+        char buf[2048]{};
         GetPrivateProfileStringA(a_section, a_key, a_default.c_str(), buf, static_cast<DWORD>(std::size(buf)), a_path.c_str());
         return buf;
     }
@@ -198,5 +198,33 @@ namespace NT
     bool CaptureEnabled()
     {
         return g_captureEnabled;
+    }
+
+    std::vector<std::string> LoadHidden()
+    {
+        const auto               path = IniPath();
+        const int                count = ReadInt("Hidden", "Count", 0, 0, 10000, path);
+        std::vector<std::string> keys;
+        for (int i = 1; i <= count; ++i) {
+            if (auto key = ReadString("Hidden", std::format("Line{}", i).c_str(), "", path); !key.empty()) {
+                keys.push_back(std::move(key));
+            }
+        }
+        logs::info("{} hidden line(s) loaded", keys.size());
+        return keys;
+    }
+
+    void SaveHidden(const std::vector<std::string>& a_keys)
+    {
+        const auto path = IniPath();
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+        WritePrivateProfileStringA("Hidden", nullptr, nullptr, path.c_str());
+        Write("Hidden", "Count", std::to_string(a_keys.size()), path);
+        for (std::size_t i = 0; i < a_keys.size(); ++i) {
+            // Quoted: the profile API strips outer quotes on read, so leading
+            // or trailing spaces and quotes inside the text survive.
+            Write("Hidden", std::format("Line{}", i + 1).c_str(), "\"" + a_keys[i] + "\"", path);
+        }
     }
 }

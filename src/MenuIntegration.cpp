@@ -15,6 +15,11 @@ namespace
     // Two-click confirmation for the reset button.
     constexpr double kConfirmSeconds = 4.0;
     double           g_confirmUntil = 0.0;
+    double           g_showAllConfirmUntil = 0.0;
+
+    // Font Awesome solid glyphs from the Menu Framework (U+F06E, U+F070).
+    constexpr auto kIconEye = "ï®";
+    constexpr auto kIconEyeSlash = "ï°";
 
     SKSEMenuFramework::Model::WindowInterface* g_positionWindow = nullptr;
 
@@ -300,18 +305,48 @@ namespace
         return std::format("{:02}:{:02}:{:02}", local.tm_hour, local.tm_min, local.tm_sec);
     }
 
+    // Eye in front of a history line: hides every line with the same hide
+    // key in the HUD, or shows them again.
+    void HideToggle(const std::string& a_key, bool a_hidden, std::uint64_t a_id)
+    {
+        const auto& t = NT::Translation::S();
+        FontAwesome::PushSolid();
+        const bool clicked = ImGuiMCP::SmallButton(std::format("{}##hide{}", a_hidden ? kIconEyeSlash : kIconEye, a_id).c_str());
+        FontAwesome::Pop();
+        Tooltip(a_hidden ? t.historyUnhide : t.historyHide);
+        if (clicked) {
+            NT::Capture::SetHidden(a_key, !a_hidden);
+        }
+    }
+
     // Page "History": the session's notifications, newest first, in their
-    // own color; merged halves appear as the one line they became.
+    // own color; merged halves appear as the one line they became. Hidden
+    // lines are grey with a closed eye.
     void __stdcall RenderHistory()
     {
         const auto& t = NT::Translation::S();
         static char filter[128]{};
+
+        const auto hidden = NT::Capture::HiddenKeys();
 
         ImGuiMCP::TextDisabled("%s", t.historyHint.c_str());
         ImGuiMCP::InputTextWithHint("##historyfilter", t.historyFilter.c_str(), filter, sizeof(filter));
         ImGuiMCP::SameLine();
         if (ImGuiMCP::Button((t.historyClear + "##historyclear").c_str())) {
             NT::Capture::ClearHistory();
+        }
+        if (!hidden.empty()) {
+            ImGuiMCP::SameLine();
+            const auto now = ImGuiMCP::GetTime();
+            const bool armed = now < g_showAllConfirmUntil;
+            if (ImGuiMCP::Button(((armed ? t.resetConfirm : std::format("{} ({})", t.historyShowAll, hidden.size())) + "##showall").c_str())) {
+                if (armed) {
+                    g_showAllConfirmUntil = 0.0;
+                    NT::Capture::ClearHidden();
+                } else {
+                    g_showAllConfirmUntil = now + kConfirmSeconds;
+                }
+            }
         }
         ImGuiMCP::Separator();
 
@@ -326,9 +361,19 @@ namespace
                         continue;
                     }
                     any = true;
+                    const auto key = NT::Capture::HideKey(it->text);
+                    const bool isHidden = hidden.contains(key);
+                    HideToggle(key, isHidden, it->id);
+                    ImGuiMCP::SameLine();
                     ImGuiMCP::TextDisabled("%s", LocalTime(it->time).c_str());
                     ImGuiMCP::SameLine();
                     const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
+                    if (isHidden) {
+                        ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled));
+                        ImGuiMCP::TextWrapped("%s", line.c_str());
+                        ImGuiMCP::PopStyleColor();
+                        continue;
+                    }
                     if (it->rgb) {
                         const auto rgb = *it->rgb;
                         ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text,

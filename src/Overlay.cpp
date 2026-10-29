@@ -171,6 +171,13 @@ namespace
             const float lifetime = a_settings.fadeIn + a_settings.duration + a_settings.fadeOut;
             const NT::Capture::Entry* previous = nullptr;
             for (auto& entry : a_entries) {
+                if (entry.hidden) {
+                    // Never drawn and never holds up the queue; it only
+                    // stays for its lifetime so a second half can merge.
+                    entry.started = true;
+                    entry.age += a_dt;
+                    continue;
+                }
                 if (!entry.started) {
                     entry.started = a_settings.immediate || !previous || !previous->started || previous->age >= a_settings.queueDelay;
                     if (!entry.started) {
@@ -185,7 +192,7 @@ namespace
             // Visible limit: the oldest lines beyond MaxVisible start fading.
             int shown = 0;
             for (auto it = a_entries.rbegin(); it != a_entries.rend(); ++it) {
-                if (!it->started) {
+                if (!it->started || it->hidden) {
                     continue;
                 }
                 if (++shown > a_settings.maxVisible) {
@@ -195,7 +202,7 @@ namespace
 
             std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) { return a_entry.started && a_entry.age >= lifetime; });
             for (const auto& entry : a_entries) {
-                if (entry.started) {
+                if (entry.started && !entry.hidden) {
                     visible.push_back(entry);
                 }
             }

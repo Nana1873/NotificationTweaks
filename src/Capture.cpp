@@ -9,6 +9,19 @@ namespace
     std::deque<NT::Capture::Entry>        g_entries;
     std::deque<NT::Capture::HistoryEntry> g_history;
     std::uint64_t                         g_nextID = 1;
+    std::set<std::string>                 g_hidden;  // hide keys, see NT::Capture::HideKey
+
+    // Caller holds g_lock.
+    bool IsHidden(std::string_view a_raw)
+    {
+        return !g_hidden.empty() && g_hidden.contains(NT::Capture::HideKey(NT::Markup::Visible(a_raw)));
+    }
+
+    // Caller holds g_lock.
+    void SaveHiddenLocked()
+    {
+        NT::SaveHidden({ g_hidden.begin(), g_hidden.end() });
+    }
 
     // Caller holds g_lock.
     void SetHistoryText(NT::Capture::HistoryEntry& a_entry, std::string_view a_raw)
@@ -187,6 +200,7 @@ namespace NT::Capture
                     last.raw = Merge::Join(last.raw, raw);
                     last.runs = Markup::Parse(last.raw);
                     last.mergedBy = rule;
+                    last.hidden = IsHidden(last.raw);
                     if (auto* history = FindHistory(last.id)) {
                         SetHistoryText(*history, last.raw);
                     }
@@ -215,6 +229,7 @@ namespace NT::Capture
         entry.raw = std::string(raw);
         entry.runs = Markup::Parse(entry.raw);
         entry.arrival = now;
+        entry.hidden = IsHidden(entry.raw);
         logs::debug("Notification #{}: {}", entry.id, Markup::ToUtf8(entry.raw));
         AddHistory(entry.id, entry.raw);
         g_entries.push_back(std::move(entry));
@@ -250,6 +265,60 @@ namespace NT::Capture
     {
         std::scoped_lock lock{ g_lock };
         g_history.clear();
+    }
+
+    std::string HideKey(std::string_view a_visible)
+    {
+        std::string key;
+        key.reserve(a_visible.size());
+        for (std::size_t i = 0; i < a_visible.size(); ++i) {
+            if (std::isdigit(static_cast<unsigned char>(a_visible[i]))) {
+                key += '#';
+                while (i + 1 < a_visible.size() && std::isdigit(static_cast<unsigned char>(a_visible[i + 1]))) {
+                    ++i;
+                }
+            } else {
+                key += a_visible[i];
+            }
+        }
+        return key;
+    }
+
+    void LoadHidden()
+    {
+        auto             keys = NT::LoadHidden();
+        std::scoped_lock lock{ g_lock };
+        g_hidden = { std::make_move_iterator(keys.begin()), std::make_move_iterator(keys.end()) };
+    }
+
+    std::set<std::string> HiddenKeys()
+    {
+        std::scoped_lock lock{ g_lock };
+        return g_hidden;
+    }
+
+    void SetHidden(const std::string& a_key, bool a_hidden)
+    {
+        std::scoped_lock lock{ g_lock };
+        if (a_hidden ? !g_hidden.insert(a_key).second : g_hidden.erase(a_key) == 0) {
+            return;
+        }
+        for (auto& entry : g_entries) {
+            entry.hidden = IsHidden(entry.raw);
+        }
+        SaveHiddenLocked();
+        logs::info("{} in the HUD: {}", a_hidden ? "Hidden" : "Shown again", a_key);
+    }
+
+    void ClearHidden()
+    {
+        std::scoped_lock lock{ g_lock };
+        g_hidden.clear();
+        for (auto& entry : g_entries) {
+            entry.hidden = false;
+        }
+        SaveHiddenLocked();
+        logs::info("All hidden lines shown again");
     }
 
     void SendTest(std::vector<std::string> a_texts)

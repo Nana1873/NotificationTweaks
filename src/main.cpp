@@ -55,6 +55,7 @@ namespace
         // (English defaults are compiled in; German ships alongside).
         NT::Translation::Import("NotificationTweaks");
         NT::Translation::LoadStrings();
+        NT::Capture::LoadHidden();
         NT::Capture::Install();
         NT::Overlay::Initialize();
         NT::MenuIntegration::Initialize();

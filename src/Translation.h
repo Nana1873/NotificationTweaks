@@ -20,6 +20,9 @@ namespace NT::Translation
         std::string historyFilter = "Filter...";
         std::string historyClear = "Clear";
         std::string historyEmpty = "No notifications yet.";
+        std::string historyHide = "Hide this message in the HUD. It stays in the history; numbers match any number.";
+        std::string historyUnhide = "Hidden in the HUD. Click to show it again.";
+        std::string historyShowAll = "Show all hidden again";
         std::string headAdvanced = "Advanced";
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";

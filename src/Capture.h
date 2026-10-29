@@ -17,6 +17,7 @@ namespace NT::Capture
         Merge::Rule                           mergedBy = Merge::Rule::kNone;
         std::chrono::steady_clock::time_point arrival;
         bool                                  started = false;  // false while waiting in queue mode
+        bool                                  hidden = false;   // matches a hide key: history only, not drawn
         float                                 age = 0.0F;       // seconds since it started showing
     };
 
@@ -51,6 +52,15 @@ namespace NT::Capture
     // Menu thread: the history, oldest first, and clearing it.
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor);
     void ClearHistory();
+
+    // Hiding: a line whose visible text matches a hide key still enters the
+    // history but is not drawn. The key is the visible text with every run
+    // of digits replaced by "#", so "25 Gold added" also hides "30 Gold added".
+    std::string           HideKey(std::string_view a_visible);
+    void                  LoadHidden();  // startup, after LoadSettings
+    std::set<std::string> HiddenKeys();
+    void                  SetHidden(const std::string& a_key, bool a_hidden);  // saves; applies to live lines too
+    void                  ClearHidden();
 
     // Sends a notification through the regular game path (SKSE task), so
     // menu tests go through the same hook as every other sender.
