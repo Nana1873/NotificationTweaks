@@ -212,6 +212,8 @@ namespace NT::Translation
         g_strings.mergeGeneric = Translate("$NT_MergeGeneric", defaults.mergeGeneric);
         g_strings.mergeGenericTip = Translate("$NT_MergeGenericTip", defaults.mergeGenericTip);
         g_strings.mergeWindow = Translate("$NT_MergeWindow", defaults.mergeWindow);
+        g_strings.hideIconOnly = Translate("$NT_HideIconOnly", defaults.hideIconOnly);
+        g_strings.hideIconOnlyTip = Translate("$NT_HideIconOnlyTip", defaults.hideIconOnlyTip);
         g_strings.testYps = Translate("$NT_TestYps", defaults.testYps);
         g_strings.testBos = Translate("$NT_TestBos", defaults.testBos);
         g_strings.sample1 = Translate("$NT_Sample1", defaults.sample1);

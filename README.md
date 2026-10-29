@@ -30,7 +30,9 @@ plugins put in the top left corner) and draws them itself through
   like Vanilla does. Quest, skill and level messages stay Vanilla.
 - Icon fonts (e.g. Oblivion Interaction Icons' `$Iconographia`) cannot be
   drawn by the overlay; their glyphs are left out instead of showing the
-  letter they are mapped to.
+  letter they are mapped to. A line that is only icons goes to the Vanilla
+  HUD, which draws the real icon, or is hidden with the Compatibility
+  option "Hide icon-only messages" (`HideIconOnly`).
 - Save-neutral: nothing is written to the save. Settings live in
   `Data/SKSE/Plugins/NotificationTweaks.ini`. Two keys exist only there:
   `[General] VerboseLog=1` logs every notification and merge, and

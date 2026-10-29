@@ -27,6 +27,7 @@ namespace
         c.visibleTime = s.fadeIn + s.duration;
         c.fadeIn = s.fadeIn;
         c.ypsLimit = s.ypsLimit;
+        c.hideIconOnly = s.hideIconOnly;
         std::scoped_lock lock{ g_captureLock };
         g_capture = c;
         g_captureEnabled = c.enabled;
@@ -139,6 +140,7 @@ namespace NT
         s.mergeGeneric = ReadBool("Compatibility", "MergeGeneric", d.mergeGeneric, path);
         s.mergeWindow = ReadFloat("Compatibility", "MergeWindow", d.mergeWindow, Limits::kMergeWindow, path);
         s.ypsLimit = ReadInt("Compatibility", "YPSLimit", d.ypsLimit, Limits::kYpsLimit, path);
+        s.hideIconOnly = ReadBool("Compatibility", "HideIconOnly", d.hideIconOnly, path);
 
         PublishCapture();
         logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {})", path,
@@ -189,6 +191,7 @@ namespace NT
         Write("Compatibility", "MergeGeneric", b(s.mergeGeneric), path);
         Write("Compatibility", "MergeWindow", f(s.mergeWindow), path);
         Write("Compatibility", "YPSLimit", std::to_string(s.ypsLimit), path);
+        Write("Compatibility", "HideIconOnly", b(s.hideIconOnly), path);
         PublishCapture();
     }
 
@@ -204,6 +207,7 @@ namespace NT
         s.mergeGeneric = keep.mergeGeneric;
         s.mergeWindow = keep.mergeWindow;
         s.ypsLimit = keep.ypsLimit;
+        s.hideIconOnly = keep.hideIconOnly;
         SaveSettings();
     }
 

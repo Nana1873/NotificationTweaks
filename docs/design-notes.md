@@ -94,6 +94,18 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   `LoadStrings()` body and both UTF-16 translation files.
 - History: last 100 lines with real time, memory only (save-neutral).
 
+## Icon fonts (1.1.0)
+
+- Oblivion Interaction Icons sets GMSTs like sQuickSaving to
+  `<font face='$Iconographia'> w </font>` (font from
+  `Interface\Fonticon.swf`, mapped in fontconfig.txt). ImGui cannot draw
+  Scaleform fonts, so `Markup::Parse` drops text inside a face whose name
+  contains "icon" or "symbol" (also the vanilla `$SkyrimSymbolsFont`).
+- A line with nothing left (`Capture::Push` returns false) goes back to
+  the Vanilla HUD, which renders the icon at its own position; with
+  `HideIconOnly` it is swallowed instead. Drawing the real glyphs would
+  need a SWF font parser and rasterizer; not done.
+
 ## Hiding (1.1.0)
 
 - The eye on a History line hides by key: `Text::HideKey` turns the

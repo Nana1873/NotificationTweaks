@@ -71,6 +71,8 @@ STRINGS = [
     ("mergeGeneric", "All mods: merge obvious continuations", "Alle Mods: offensichtliche Fortsetzungen zusammenführen"),
     ("mergeGenericTip", "First line without a sentence end, second line starts lowercase. Can also join unrelated messages.", "Erste Zeile ohne Satzende, zweite beginnt mit Kleinbuchstaben. Kann auch unabhängige Meldungen verbinden."),
     ("mergeWindow", "Max. gap between halves", "Max. Abstand der Hälften"),
+    ("hideIconOnly", "Hide icon-only messages (e.g. Oblivion Interaction Icons)", "Reine Icon-Meldungen ausblenden (z. B. Oblivion Interaction Icons)"),
+    ("hideIconOnlyTip", "Some mods send messages that are only an icon from their own font, like the OII save icon. The plugin cannot draw that font. Off: the Vanilla HUD shows these icons at its own position. On: they are not shown. Text with an icon always shows without the icon.", "Manche Mods senden Meldungen, die nur aus einem Icon ihres eigenen Fonts bestehen, etwa das Speichern-Icon von OII. Diesen Font kann das Plugin nicht zeichnen. Aus: Das Vanilla-HUD zeigt diese Icons an seiner eigenen Position. An: Sie werden nicht angezeigt. Text mit Icon erscheint immer ohne das Icon."),
     ("testYps", "Test YPS split", "YPS-Teilung testen"),
     ("testBos", "Test BoS split", "BoS-Teilung testen"),
     ("sample1", "Notification Tweaks: sample line", "Notification Tweaks: Beispielzeile"),

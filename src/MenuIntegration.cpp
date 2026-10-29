@@ -262,6 +262,8 @@ namespace
         Tooltip(t.mergeBosTip);
         Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
         Tooltip(t.mergeGenericTip);
+        Commit(ImGuiMCP::Checkbox((t.hideIconOnly + "##iconsonly").c_str(), &s.hideIconOnly));
+        Tooltip(t.hideIconOnlyTip);
         SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
 
         ImGuiMCP::SeparatorText(t.headTest.c_str());

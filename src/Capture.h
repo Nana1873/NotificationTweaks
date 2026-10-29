@@ -42,8 +42,11 @@ namespace NT::Capture
     // Menu Framework is present (without it nothing could draw the text).
     void Install();
 
-    // Main thread: a notification the HUD would have shown.
-    void Push(std::string_view a_raw);
+    // Main thread: a notification the HUD would have shown. False when the
+    // line has nothing the overlay can draw (only icon-font glyphs); the
+    // caller then leaves it to the Vanilla HUD, or drops it when
+    // HideIconOnly is on.
+    bool Push(std::string_view a_raw);
 
     // Render thread (overlay): exclusive access to the live entries, oldest first.
     void Visit(const std::function<void(std::deque<Entry>&)>& a_visitor);

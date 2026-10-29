@@ -97,9 +97,13 @@ namespace
     // Vanilla display (plugin switched off): the history still records.
     void RecordOnly(std::string_view a_raw)
     {
-        const auto translated = TranslateKey(a_raw);
+        const auto       translated = TranslateKey(a_raw);
+        const auto       raw = translated.empty() ? a_raw : std::string_view{ translated };
+        if (NT::Markup::Visible(raw).empty()) {
+            return;  // only icon glyphs: an empty history line would say nothing
+        }
         std::scoped_lock lock{ g_lock };
-        AddHistory(g_nextID++, translated.empty() ? a_raw : std::string_view{ translated });
+        AddHistory(g_nextID++, raw);
     }
 
     const char* RuleName(NT::Merge::Rule a_rule)
@@ -114,6 +118,15 @@ namespace
         default:
             return "none";
         }
+    }
+
+    // False for a line with nothing the overlay can draw, e.g. only an
+    // icon-font glyph (Oblivion Interaction Icons' save icon): those stay
+    // with the Vanilla HUD, which renders the icon font.
+    bool Drawable(std::string_view a_raw)
+    {
+        const auto translated = TranslateKey(a_raw);
+        return !NT::Markup::Visible(translated.empty() ? a_raw : std::string_view{ translated }).empty();
     }
 
     NT::Merge::Rule MatchRule(const NT::Capture::Entry& a_previous, std::string_view a_raw, const NT::CaptureSettings& a_settings)
@@ -151,8 +164,8 @@ namespace
                         }
                         return func(a_this, a_message);
                     }
-                    if (text && *text) {
-                        NT::Capture::Push(text);
+                    if (text && *text && !NT::Capture::Push(text) && !NT::CaptureConfig().hideIconOnly) {
+                        return func(a_this, a_message);  // only icon glyphs: Vanilla can draw them
                     }
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
@@ -172,7 +185,9 @@ namespace
             if (a_this && NT::CaptureEnabled()) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
-                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word) {
+                    // Icon-only lines stay for Vanilla unless the player hides them.
+                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word &&
+                        (Drawable(it->text.c_str()) || NT::CaptureConfig().hideIconOnly)) {
                         static bool logged = false;
                         if (!logged) {
                             logged = true;
@@ -211,13 +226,13 @@ namespace NT::Capture
         logs::info("Hooked HUDMenu::ProcessMessage and HUDNotifications::Update");
     }
 
-    void Push(std::string_view a_raw)
+    bool Push(std::string_view a_raw)
     {
+        if (!Drawable(a_raw)) {
+            return false;
+        }
         const auto             translated = TranslateKey(a_raw);
         const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
-        if (Markup::Visible(raw).empty()) {
-            return;  // nothing drawable, e.g. only an icon-font glyph
-        }
 
         const auto s = CaptureConfig();
         const auto  now = std::chrono::steady_clock::now();
@@ -237,7 +252,7 @@ namespace NT::Capture
                         SetHistoryText(*history, last.raw);
                     }
                     logs::debug("Merged ({}, {:.0f} ms): {}", RuleName(rule), gap * 1000.0F, Markup::ToUtf8(last.raw));
-                    return;
+                    return true;
                 }
             }
         }
@@ -251,7 +266,7 @@ namespace NT::Capture
                         history->count = entry.count;
                         history->time = std::chrono::system_clock::now();
                     }
-                    return;
+                    return true;
                 }
             }
         }
@@ -270,6 +285,7 @@ namespace NT::Capture
         while (g_entries.size() > NT::Capture::kMaxPendingEntries) {
             g_entries.pop_front();
         }
+        return true;
     }
 
     void Visit(const std::function<void(std::deque<Entry>&)>& a_visitor)
