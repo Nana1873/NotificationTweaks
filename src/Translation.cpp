@@ -220,8 +220,6 @@ namespace NT::Translation
         g_strings.iconFontsNone = Translate("$NT_IconFontsNone", defaults.iconFontsNone);
         g_strings.iconFontGlyphs = Translate("$NT_IconFontGlyphs", defaults.iconFontGlyphs);
         g_strings.historyIconOnly = Translate("$NT_HistoryIconOnly", defaults.historyIconOnly);
-        g_strings.testYps = Translate("$NT_TestYps", defaults.testYps);
-        g_strings.testBos = Translate("$NT_TestBos", defaults.testBos);
         g_strings.sample1 = Translate("$NT_Sample1", defaults.sample1);
         g_strings.sample2 = Translate("$NT_Sample2", defaults.sample2);
         g_strings.sample3 = Translate("$NT_Sample3", defaults.sample3);
@@ -230,9 +228,6 @@ namespace NT::Translation
         g_strings.done = Translate("$NT_Done", defaults.done);
         g_strings.testText = Translate("$NT_TestText", defaults.testText);
         g_strings.testManyText = Translate("$NT_TestManyText", defaults.testManyText);
-        g_strings.testYpsText = Translate("$NT_TestYpsText", defaults.testYpsText);
-        g_strings.testBosFirst = Translate("$NT_TestBosFirst", defaults.testBosFirst);
-        g_strings.testBosSecond = Translate("$NT_TestBosSecond", defaults.testBosSecond);
         logs::info("UI strings loaded ('{}')", g_strings.pageDisplay);
     }
 

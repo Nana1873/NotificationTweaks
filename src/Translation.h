@@ -83,8 +83,6 @@ namespace NT::Translation
         std::string iconFontsNone = "No icon font found.";
         std::string iconFontGlyphs = "icons";
         std::string historyIconOnly = "(icon)";
-        std::string testYps = "Test YPS split";
-        std::string testBos = "Test BoS split";
         std::string sample1 = "Notification Tweaks: sample line";
         std::string sample2 = "Drag with the left mouse button";
         std::string sample3 = "<font color=\"#FF00FF\">A colored line</font>";
@@ -93,9 +91,6 @@ namespace NT::Translation
         std::string done = "Done";
         std::string testText = "This is a test notification.";
         std::string testManyText = "Message";
-        std::string testYpsText = "I love how my shoulder-length hair lets me switch effortlessly between casual and elegant hairstyles.";
-        std::string testBosFirst = "I can't stop thinking about";
-        std::string testBosSecond = "how pretty my nails look...";
     };
 
     void           LoadStrings();

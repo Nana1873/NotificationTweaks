@@ -240,31 +240,10 @@ namespace
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
     }
 
-    // Splits a_text exactly like ypsThoughts.psc does, for the test button.
-    std::vector<std::string> YpsSplit(const std::string& a_text)
-    {
-        const auto split = NT::Merge::YpsSplitPos(a_text);
-        if (split >= a_text.size()) {
-            return { a_text };
-        }
-        return { a_text.substr(0, split), a_text.substr(split + 1) };
-    }
-
     void __stdcall RenderCompat()
     {
         const auto& t = NT::Translation::S();
         auto&       s = NT::Config();
-
-        ImGuiMCP::SeparatorText(t.headMerge.c_str());
-        ImGuiMCP::TextWrapped("%s", t.compatHint.c_str());
-        ImGuiMCP::Spacing();
-        Commit(ImGuiMCP::Checkbox((t.mergeYps + "##yps").c_str(), &s.mergeYps));
-        Tooltip(t.mergeYpsTip);
-        Commit(ImGuiMCP::Checkbox((t.mergeBos + "##bos").c_str(), &s.mergeBos));
-        Tooltip(t.mergeBosTip);
-        Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
-        Tooltip(t.mergeGenericTip);
-        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
 
         ImGuiMCP::SeparatorText(t.headIconFonts.c_str());
         if (const bool changed = ImGuiMCP::Checkbox((t.drawIconFonts + "##iconfonts").c_str(), &s.drawIconFonts); changed) {
@@ -289,14 +268,16 @@ namespace
             }
         }
 
-        ImGuiMCP::SeparatorText(t.headTest.c_str());
-        if (ImGuiMCP::Button((t.testYps + "##testyps").c_str())) {
-            NT::Capture::SendTest(YpsSplit(t.testYpsText));
-        }
-        ImGuiMCP::SameLine();
-        if (ImGuiMCP::Button((t.testBos + "##testbos").c_str())) {
-            NT::Capture::SendTest({ "<font color=\"#FF00FF\">" + t.testBosFirst + "</font>", "<font color=\"#FF00FF\">" + t.testBosSecond + "</font>" });
-        }
+        ImGuiMCP::SeparatorText(t.headMerge.c_str());
+        ImGuiMCP::TextWrapped("%s", t.compatHint.c_str());
+        ImGuiMCP::Spacing();
+        Commit(ImGuiMCP::Checkbox((t.mergeYps + "##yps").c_str(), &s.mergeYps));
+        Tooltip(t.mergeYpsTip);
+        Commit(ImGuiMCP::Checkbox((t.mergeBos + "##bos").c_str(), &s.mergeBos));
+        Tooltip(t.mergeBosTip);
+        Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
+        Tooltip(t.mergeGenericTip);
+        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
 
         ImGuiMCP::Spacing();
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
@@ -330,9 +311,22 @@ namespace
         }
     }
 
-    // Icon-font glyphs of a history line, one text line high, each followed
-    // by SameLine. Returns how many were drawn.
-    int HistoryIcons(const NT::Capture::HistoryEntry& a_entry, const ImGuiMCP::ImVec4& a_tint)
+    // An invisible, inactive eye: rows without one keep the same columns.
+    void EyeSpacer(std::uint64_t a_id)
+    {
+        ImGuiMCP::BeginDisabled(true);
+        ImGuiMCP::PushStyleVar(ImGuiMCP::ImGuiStyleVar_Alpha, 0.0F);
+        FontAwesome::PushSolid();
+        ImGuiMCP::SmallButton(std::format("{}###hide{}", kIconEye, a_id).c_str());
+        FontAwesome::Pop();
+        ImGuiMCP::PopStyleVar();
+        ImGuiMCP::EndDisabled();
+    }
+
+    // Icon-font glyphs of a history line, one text line high, on the current
+    // line; with a_textFollows the text continues on the same line after
+    // them. Returns how many were drawn.
+    int HistoryIcons(const NT::Capture::HistoryEntry& a_entry, const ImGuiMCP::ImVec4& a_tint, bool a_textFollows)
     {
         if (!NT::Config().drawIconFonts) {
             return 0;
@@ -341,10 +335,15 @@ namespace
         int         drawn = 0;
         for (const auto& [face, code] : a_entry.icons) {
             if (const auto icon = NT::IconFont::Get(face, code, height)) {
+                if (drawn > 0) {
+                    ImGuiMCP::SameLine();
+                }
                 ImGuiMCP::Image(icon->texture, { icon->aspect * height, height }, icon->uv0, icon->uv1, a_tint);
-                ImGuiMCP::SameLine();
                 ++drawn;
             }
+        }
+        if (drawn > 0 && a_textFollows) {
+            ImGuiMCP::SameLine();
         }
         return drawn;
     }
@@ -392,13 +391,13 @@ namespace
                     continue;
                 }
                 any = true;
-                // Icon-only lines have no text to hide by: a blank of the
-                // eye's size keeps the columns aligned.
+                // Icon-only lines have no text to hide by: an invisible eye
+                // keeps the columns aligned.
                 const bool iconsOnly = it->text.empty();
                 const auto key = iconsOnly ? std::string{} : NT::Text::HideKey(it->text);
                 const bool isHidden = !iconsOnly && hidden.contains(key);
                 if (iconsOnly) {
-                    ImGuiMCP::Dummy({ ImGuiMCP::GetFrameHeight(), ImGuiMCP::GetFrameHeight() });
+                    EyeSpacer(it->id);
                 } else {
                     HideToggle(key, isHidden, it->id);
                 }
@@ -409,12 +408,10 @@ namespace
                 const auto color = isHidden ? *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled) :
                                    it->rgb  ? NT::Overlay::RgbColor(*it->rgb) :
                                               *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_Text);
-                const int  icons = HistoryIcons(*it, color);
+                const int  icons = HistoryIcons(*it, color, !iconsOnly);
                 if (iconsOnly) {
                     if (icons == 0) {
                         ImGuiMCP::TextDisabled("%s", t.historyIconOnly.c_str());  // font missing or off
-                    } else {
-                        ImGuiMCP::NewLine();  // end the SameLine after the last icon
                     }
                     continue;
                 }

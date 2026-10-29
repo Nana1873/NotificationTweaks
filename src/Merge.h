@@ -26,7 +26,8 @@ namespace NT::Merge
     bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit);
 
     // Where ypsThoughts.psc cuts a_text: the first space at or after
-    // max(30, len / 2 - 3), or a_text.size() when there is none.
+    // max(30, len / 2 - 3), or a_text.size() when there is none. Used by
+    // IsYpsSplit and the unit tests.
     std::size_t YpsSplitPos(std::string_view a_text);
 
     // Reads every string from Data/SKSE/Plugins/ypsThoughts/*.json (YPS and

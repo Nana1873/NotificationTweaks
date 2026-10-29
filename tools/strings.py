@@ -79,8 +79,6 @@ STRINGS = [
     ("iconFontsNone", "No icon font found.", "Kein Icon-Font gefunden."),
     ("iconFontGlyphs", "icons", "Icons"),
     ("historyIconOnly", "(icon)", "(Icon)"),
-    ("testYps", "Test YPS split", "YPS-Teilung testen"),
-    ("testBos", "Test BoS split", "BoS-Teilung testen"),
     ("sample1", "Notification Tweaks: sample line", "Notification Tweaks: Beispielzeile"),
     ("sample2", "Drag with the left mouse button", "Mit gedrückter linker Maustaste ziehen"),
     ("sample3", '<font color="#FF00FF">A colored line</font>', '<font color="#FF00FF">Eine farbige Zeile</font>'),
@@ -89,9 +87,6 @@ STRINGS = [
     ("done", "Done", "Fertig"),
     ("testText", "This is a test notification.", "Das ist eine Testbenachrichtigung."),
     ("testManyText", "Message", "Meldung"),
-    ("testYpsText", "I love how my shoulder-length hair lets me switch effortlessly between casual and elegant hairstyles.", "Ich liebe, wie ich mit schulterlangen Haaren mühelos zwischen lässigen und eleganten Frisuren wechseln kann."),
-    ("testBosFirst", "I can't stop thinking about", "Ich muss ständig daran denken,"),
-    ("testBosSecond", "how pretty my nails look...", "wie hübsch meine Nägel aussehen..."),
 ]
 
 
