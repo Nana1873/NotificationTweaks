@@ -336,7 +336,7 @@ namespace
         for (const auto& [face, code] : a_entry.icons) {
             if (const auto icon = NT::IconFont::Get(face, code, height)) {
                 if (drawn > 0) {
-                    ImGuiMCP::SameLine();
+                    ImGuiMCP::SameLine(0.0F, 0.0F);  // glyphs packed, as in the overlay
                 }
                 ImGuiMCP::Image(icon->texture, { icon->aspect * height, height }, icon->uv0, icon->uv1, a_tint);
                 ++drawn;
@@ -391,11 +391,10 @@ namespace
                     continue;
                 }
                 any = true;
-                // Icon-only lines are keyed by their glyphs; a line with
-                // neither (nothing left at all) gets an invisible eye that
-                // keeps the columns aligned.
-                const bool iconsOnly = it->text.empty();
-                const auto key = iconsOnly ? NT::Markup::IconKey(it->icons) : NT::Text::HideKey(it->text);
+                // A line with neither text nor icons cannot be hidden; an
+                // invisible eye keeps the columns aligned.
+                const bool noText = it->text.empty();
+                const auto key = NT::Markup::LineHideKey(it->text, it->icons);
                 const bool isHidden = !key.empty() && hidden.contains(key);
                 if (key.empty()) {
                     EyeSpacer(it->id);
@@ -409,10 +408,12 @@ namespace
                 const auto color = isHidden ? *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled) :
                                    it->rgb  ? NT::Overlay::RgbColor(*it->rgb) :
                                               *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_Text);
-                const int  icons = HistoryIcons(*it, color, !iconsOnly);
-                if (iconsOnly) {
-                    if (icons == 0) {
+                const int  icons = HistoryIcons(*it, color, !noText);
+                if (noText) {
+                    if (icons == 0 && !it->icons.empty()) {
                         ImGuiMCP::TextDisabled("%s", t.historyIconOnly.c_str());  // font missing or off
+                    } else if (icons == 0) {
+                        ImGuiMCP::TextUnformatted("");  // nothing visible: end the row after the time
                     }
                     continue;
                 }

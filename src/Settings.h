@@ -124,7 +124,7 @@ namespace NT
     // Any thread, lock-free: CaptureConfig().enabled, for the per-frame hooks.
     bool CaptureEnabled();
 
-    // [Hidden]: the hide keys (Text::HideKey) of lines the player hid in
+    // [Hidden]: the hide keys (Markup::LineHideKey) of lines the player hid in
     // the HUD. Capture owns the live set and calls these.
     std::vector<std::string> ReadHiddenKeys();
     void                     WriteHiddenKeys(const std::vector<std::string>& a_keys);

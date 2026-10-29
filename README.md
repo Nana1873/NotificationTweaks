@@ -32,11 +32,12 @@ plugins put in the top left corner) and draws them itself through
 - Icon fonts (e.g. Oblivion Interaction Icons' `$Iconographia`): the
   plugin reads the font library `Interface/fontconfig.txt` maps the face
   to (OII's `Fonticon.swf`, from your own install) and draws the real
-  icons with the lines. Icon fonts mapped in fontconfig.txt are read once
-  at startup (the vanilla `$SkyrimSymbolsFont` and, with OII,
-  `$Iconographia`). With "Draw icon fonts" off (`DrawIconFonts=0`), or when the font
-  cannot be read, icons are left out and an icon-only line goes to the
-  Vanilla HUD.
+  icons with the lines and in the history. Icon fonts mapped in
+  fontconfig.txt are read at startup, or when the option is switched on
+  (the vanilla `$SkyrimSymbolsFont` and, with OII, `$Iconographia`). With
+  "Draw icon fonts" off (`DrawIconFonts=0`), or when the font cannot be
+  read, icons are left out and an icon-only line goes to the Vanilla HUD,
+  unless you hid it.
 - Save-neutral: nothing is written to the save. Settings live in
   `Data/SKSE/Plugins/NotificationTweaks.ini`. Two keys exist only there:
   `[General] VerboseLog=1` logs every notification and merge, and

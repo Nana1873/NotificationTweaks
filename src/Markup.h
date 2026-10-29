@@ -37,9 +37,15 @@ namespace NT::Markup
     using IconList = std::vector<std::pair<std::string, char32_t>>;
     IconList Icons(std::string_view a_raw);
 
-    // Hide key of an icon-only line ("[icon] $Iconographia:w"); a line with
-    // text is keyed by its text instead (Text::HideKey of Visible()).
+    // Key of a line's icon glyphs ("[icon] $iconographia:w", face lowercased
+    // as IconFont matches it); empty without icons.
     std::string IconKey(const IconList& a_icons);
+
+    // The hide key of a line (the eye on the History page, [Hidden] in the
+    // INI): its text with digit runs as "#" (Text::HideKey), or IconKey for
+    // a line without text. Empty: the line cannot be hidden.
+    std::string LineHideKey(std::string_view a_visible, const IconList& a_icons);
+    std::string LineHideKey(std::string_view a_raw);
 
     // The color of the outermost <font color> when it wraps the whole text.
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw);

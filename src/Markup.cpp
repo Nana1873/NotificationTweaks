@@ -227,11 +227,21 @@ namespace NT::Markup
         std::string key = "[icon]";
         for (const auto& [face, code] : a_icons) {
             key += ' ';
-            key += face;
+            key += NT::Text::LowerAscii(face);
             key += ':';
             NT::Text::AppendUtf8(code, key);
         }
         return key;
+    }
+
+    std::string LineHideKey(std::string_view a_visible, const IconList& a_icons)
+    {
+        return a_visible.empty() ? IconKey(a_icons) : NT::Text::HideKey(a_visible);
+    }
+
+    std::string LineHideKey(std::string_view a_raw)
+    {
+        return LineHideKey(Visible(a_raw), Icons(a_raw));
     }
 
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw)

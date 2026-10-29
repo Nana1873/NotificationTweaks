@@ -128,8 +128,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 - Nothing ships from OII: the font is read from the player's install.
 - A line with nothing drawable (icon fonts off via `DrawIconFonts`, or
   the font missing) makes `Capture::Push` return false and goes back to
-  the Vanilla HUD, which renders the icon itself; it is still recorded in
-  the history (shown as "(icon)" without an eye).
+  the Vanilla HUD, which renders the icon itself, unless it is hidden
+  (then Push swallows it). It is recorded in the history either way.
+- The History page draws a line's icon glyphs before its text (one text
+  line high, tinted like the line); "(icon)" only appears when the glyphs
+  cannot be drawn. Icon-only lines get an eye too (see Hiding).
 - Verified in game (AE 1.7.104, OII DSD 2.60): 60 drawable glyphs; save
   and load icons, colored icons and icon + text render at the overlay's
   position.

@@ -61,8 +61,9 @@ namespace NT::Capture
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor);
     void ClearHistory();
 
-    // Hiding: a line whose visible text matches a hide key (Text::HideKey)
-    // still enters the history but is not drawn.
+    // Hiding: a line whose Markup::LineHideKey (text, or icons for a line
+    // without text) is a hidden key still enters the history but is not
+    // drawn.
     void                  LoadHidden();  // startup, after LoadSettings
     std::set<std::string> HiddenKeys();
     void                  SetHidden(const std::string& a_key, bool a_hidden);  // saves; applies to live lines too

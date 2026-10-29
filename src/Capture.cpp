@@ -11,16 +11,12 @@ namespace
     std::deque<NT::Capture::Entry>        g_entries;
     std::deque<NT::Capture::HistoryEntry> g_history;
     std::uint64_t                         g_nextID = 1;
-    std::set<std::string>                 g_hidden;  // hide keys, see NT::Text::HideKey
+    std::set<std::string>                 g_hidden;  // hide keys, see NT::Markup::LineHideKey
 
     // Caller holds g_lock.
     bool IsHidden(std::string_view a_raw)
     {
-        if (g_hidden.empty()) {
-            return false;
-        }
-        const auto text = NT::Markup::Visible(a_raw);
-        return g_hidden.contains(text.empty() ? NT::Markup::IconKey(NT::Markup::Icons(a_raw)) : NT::Text::HideKey(text));
+        return !g_hidden.empty() && g_hidden.contains(NT::Markup::LineHideKey(a_raw));
     }
 
     // Caller holds g_lock. A line that stops being hidden starts over, so it
@@ -99,17 +95,21 @@ namespace
         return std::string(a_raw);
     }
 
-    // A line the Vanilla HUD shows: the history still records it.
-    void RecordResolved(std::string_view a_resolved)
-    {
-        std::scoped_lock lock{ g_lock };
-        AddHistory(g_nextID++, a_resolved);
-    }
-
-    // Plugin switched off.
+    // Plugin switched off: the Vanilla HUD shows the line, the history
+    // still records it.
     void RecordOnly(std::string_view a_raw)
     {
-        RecordResolved(Resolve(a_raw));
+        const auto       resolved = Resolve(a_raw);
+        std::scoped_lock lock{ g_lock };
+        AddHistory(g_nextID++, resolved);
+    }
+
+    // Any thread except under g_lock: whether the player hid this line.
+    bool IsHiddenLine(std::string_view a_raw)
+    {
+        const auto       resolved = Resolve(a_raw);
+        std::scoped_lock lock{ g_lock };
+        return IsHidden(resolved);
     }
 
     const char* RuleName(NT::Merge::Rule a_rule)
@@ -137,19 +137,7 @@ namespace
         if (!NT::CaptureConfig().drawIconFonts) {
             return false;
         }
-        for (const auto& run : NT::Markup::Parse(a_resolved)) {
-            if (run.iconFace.empty()) {
-                continue;
-            }
-            for (std::size_t i = 0; i < run.text.size();) {
-                // Whitespace is spacing, as in Overlay's Layout.
-                const auto code = NT::Text::NextCodePoint(run.text, i);
-                if (code != U' ' && code != U'\t' && NT::IconFont::Has(run.iconFace, code)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return std::ranges::any_of(NT::Markup::Icons(a_resolved), [](const auto& a_icon) { return NT::IconFont::Has(a_icon.first, a_icon.second); });
     }
 
     bool Drawable(std::string_view a_raw)
@@ -213,8 +201,10 @@ namespace
             if (a_this && NT::CaptureEnabled()) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
-                    // Lines we cannot draw (only unknown icons) stay for Vanilla.
-                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word && Drawable(it->text.c_str())) {
+                    // Lines we cannot draw (only unknown icons) stay for Vanilla,
+                    // unless the player hid them (Push swallows those).
+                    if (it->type == RE::HUD_MESSAGE_TYPE::kNotification && !it->quest && !it->word &&
+                        (Drawable(it->text.c_str()) || IsHiddenLine(it->text.c_str()))) {
                         static bool logged = false;
                         if (!logged) {
                             logged = true;
