@@ -47,6 +47,7 @@ namespace
         CHECK(PercentUnescape("%4G") == "%4G");
         CHECK(PercentUnescape("a%41b") == "aAb");
 
+        CHECK(LowerAscii("AbC\xC3\x84") == "abc\xC3\x84");  // ASCII only, UTF-8 bytes untouched
         CHECK(Trim("  \tx y\t ") == "x y");
         CHECK(Trim("   ").empty());
         CHECK(Lower("\xC3\x84" "BC") == "\xC3\xA4" "bc");

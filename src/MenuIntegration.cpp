@@ -264,10 +264,12 @@ namespace
         Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
         Tooltip(t.mergeGenericTip);
         if (const bool changed = ImGuiMCP::Checkbox((t.drawIconFonts + "##iconfonts").c_str(), &s.drawIconFonts); changed) {
-            NT::SaveSettings();
+            // Load before publishing the setting, so the game thread never
+            // finds the option on with the fonts still unread.
             if (s.drawIconFonts) {
-                NT::IconFont::Preload();  // off at startup: load now, not in the middle of play
+                NT::IconFont::Preload();
             }
+            NT::SaveSettings();
         }
         Tooltip(t.drawIconFontsTip);
         if (s.drawIconFonts) {
