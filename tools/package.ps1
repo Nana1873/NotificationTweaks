@@ -12,7 +12,8 @@ $version = (Get-Content (Join-Path $root 'vcpkg.json') -Raw | ConvertFrom-Json).
 if (-not $version) { throw "No version-semver in vcpkg.json" }
 
 $cmakeVersion = [regex]::Match((Get-Content (Join-Path $root 'CMakeLists.txt') -Raw), 'project\(\S+ VERSION (\S+)').Groups[1].Value
-if ($cmakeVersion -ne $version) { throw "Version mismatch: vcpkg.json $version, CMakeLists.txt $cmakeVersion" }
+# CMake versions have no prerelease tag, so compare the numeric core.
+if ($cmakeVersion -ne ($version -replace '-.*$', '')) { throw "Version mismatch: vcpkg.json $version, CMakeLists.txt $cmakeVersion" }
 
 & python -I (Join-Path $root 'tools\strings.py') --check
 if ($LASTEXITCODE -ne 0) { throw 'Generated string files are out of date (run python -I tools\strings.py)' }
@@ -23,6 +24,13 @@ $newestSource = Get-ChildItem (Join-Path $root 'src') -File | Sort-Object LastWr
 if ($newestSource.LastWriteTime -gt (Get-Item $dll).LastWriteTime) {
     throw "DLL is older than src\$($newestSource.Name) (run tools\build.ps1 first)"
 }
+
+# build.ps1 links the DLL before the tests run, so a failed test still
+# leaves a fresh DLL behind: run them again here.
+$tests = Join-Path $root "build\$Preset\NotificationTweaksTests.exe"
+if (-not (Test-Path $tests)) { throw "Unit tests not built: $tests (run tools\build.ps1 first)" }
+& $tests
+if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed' }
 
 $translations = Join-Path $root 'config\Interface\Translations'
 if (-not (Test-Path (Join-Path $translations 'NotificationTweaks_ENGLISH.txt'))) {

@@ -152,6 +152,10 @@ if "--check" in sys.argv:
 
 out.mkdir(parents=True, exist_ok=True)
 for path, (data, text) in outputs.items():
+    # Unchanged files keep their timestamp (package.ps1 compares it with the DLL).
+    current = path.read_bytes() if path.exists() else None
+    if current is not None and (current.replace(b"\r\n", b"\n") == data.replace(b"\r\n", b"\n") if text else current == data):
+        continue
     if text:
         path.write_text(data.decode("utf-8"), encoding="utf-8")
     else:

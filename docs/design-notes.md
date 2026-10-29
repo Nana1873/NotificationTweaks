@@ -96,7 +96,7 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 
 ## Hiding (1.1.0)
 
-- The eye on a History line hides by key: `Capture::HideKey` turns the
+- The eye on a History line hides by key: `Text::HideKey` turns the
   visible text (`Markup::Visible`) into a key with every ASCII digit run
   replaced by `#`, so "25 Gold added" and "30 Gold added" share one key.
 - Keys live in `[Hidden]` as `Count` plus `Line1..N`, each value quoted
@@ -120,7 +120,10 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   `Merge.cpp` and `Markup.cpp` against `tests/TestPCH.h` (no CommonLibSSE,
   `logs::` is a no-op). Hooks, overlay and menu stay in-game tests.
 - `tools/deploy.ps1 [-Register]`, then
-  `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Loading the save
+  `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Most tests need
+  no save: `coc riverwood` (DevBench console) from the main menu avoids
+  the missing-content dialogs. Two overlapping loads (a stale load script
+  plus a manual one) crashed in `Main::ReloadFormData`. Loading the save
   by name only works once the data is loaded; the test save asks about
   missing `iWant Status Bars.esp` / `SLWidgets.esp` (answer Yes, never
   save); a Bethesda.net `LoginMenu` can block the load (close it).
