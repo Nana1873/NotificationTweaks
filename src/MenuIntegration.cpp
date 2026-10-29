@@ -18,8 +18,8 @@ namespace
     double           g_showAllConfirmUntil = 0.0;
 
     // Font Awesome solid glyphs from the Menu Framework (U+F06E, U+F070).
-    constexpr auto kIconEye = "ï®";
-    constexpr auto kIconEyeSlash = "ï°";
+    constexpr auto kIconEye = "\xEF\x81\xAE";
+    constexpr auto kIconEyeSlash = "\xEF\x81\xB0";
 
     SKSEMenuFramework::Model::WindowInterface* g_positionWindow = nullptr;
 
@@ -310,9 +310,13 @@ namespace
     void HideToggle(const std::string& a_key, bool a_hidden, std::uint64_t a_id)
     {
         const auto& t = NT::Translation::S();
+        // Hiding only acts on the plugin's own lines; with the plugin off the
+        // Vanilla HUD shows everything.
+        ImGuiMCP::BeginDisabled(!NT::CaptureEnabled());
         FontAwesome::PushSolid();
         const bool clicked = ImGuiMCP::SmallButton(std::format("{}##hide{}", a_hidden ? kIconEyeSlash : kIconEye, a_id).c_str());
         FontAwesome::Pop();
+        ImGuiMCP::EndDisabled();
         Tooltip(a_hidden ? t.historyUnhide : t.historyHide);
         if (clicked) {
             NT::Capture::SetHidden(a_key, !a_hidden);
@@ -335,7 +339,9 @@ namespace
         if (ImGuiMCP::Button((t.historyClear + "##historyclear").c_str())) {
             NT::Capture::ClearHistory();
         }
-        if (!hidden.empty()) {
+        if (hidden.empty()) {
+            g_showAllConfirmUntil = 0.0;
+        } else {
             ImGuiMCP::SameLine();
             const auto now = ImGuiMCP::GetTime();
             const bool armed = now < g_showAllConfirmUntil;

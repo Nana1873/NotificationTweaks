@@ -17,10 +17,15 @@ namespace
         return !g_hidden.empty() && g_hidden.contains(NT::Capture::HideKey(NT::Markup::Visible(a_raw)));
     }
 
-    // Caller holds g_lock.
-    void SaveHiddenLocked()
+    // Caller holds g_lock. A line that stops being hidden starts over, so it
+    // queues and fades in like a new one instead of popping up mid-life.
+    void UpdateHidden(NT::Capture::Entry& a_entry, bool a_hidden)
     {
-        NT::SaveHidden({ g_hidden.begin(), g_hidden.end() });
+        if (a_entry.hidden && !a_hidden) {
+            a_entry.started = false;
+            a_entry.age = 0.0F;
+        }
+        a_entry.hidden = a_hidden;
     }
 
     // Caller holds g_lock.
@@ -200,7 +205,7 @@ namespace NT::Capture
                     last.raw = Merge::Join(last.raw, raw);
                     last.runs = Markup::Parse(last.raw);
                     last.mergedBy = rule;
-                    last.hidden = IsHidden(last.raw);
+                    UpdateHidden(last, IsHidden(last.raw));
                     if (auto* history = FindHistory(last.id)) {
                         SetHistoryText(*history, last.raw);
                     }
@@ -299,25 +304,35 @@ namespace NT::Capture
 
     void SetHidden(const std::string& a_key, bool a_hidden)
     {
-        std::scoped_lock lock{ g_lock };
-        if (a_hidden ? !g_hidden.insert(a_key).second : g_hidden.erase(a_key) == 0) {
+        if (a_key.empty()) {
             return;
         }
-        for (auto& entry : g_entries) {
-            entry.hidden = IsHidden(entry.raw);
+        std::vector<std::string> keys;
+        {
+            std::scoped_lock lock{ g_lock };
+            if (a_hidden ? !g_hidden.insert(a_key).second : g_hidden.erase(a_key) == 0) {
+                return;
+            }
+            for (auto& entry : g_entries) {
+                UpdateHidden(entry, IsHidden(entry.raw));
+            }
+            keys.assign(g_hidden.begin(), g_hidden.end());
         }
-        SaveHiddenLocked();
+        // Outside the lock: every profile write rewrites the whole INI.
+        NT::SaveHidden(keys);
         logs::info("{} in the HUD: {}", a_hidden ? "Hidden" : "Shown again", a_key);
     }
 
     void ClearHidden()
     {
-        std::scoped_lock lock{ g_lock };
-        g_hidden.clear();
-        for (auto& entry : g_entries) {
-            entry.hidden = false;
+        {
+            std::scoped_lock lock{ g_lock };
+            g_hidden.clear();
+            for (auto& entry : g_entries) {
+                UpdateHidden(entry, false);
+            }
         }
-        SaveHiddenLocked();
+        NT::SaveHidden({});
         logs::info("All hidden lines shown again");
     }
 
