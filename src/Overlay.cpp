@@ -9,6 +9,10 @@ namespace
 {
     using ImGuiMCP::ImVec2;
 
+    // Drag frame: minimum width around an empty block and padding, in pixels.
+    constexpr float kDragMinWidth = 160.0F;
+    constexpr float kDragPadding = 6.0F;
+
     std::atomic<bool> g_positioning{ false };
     bool              g_dragging = false;
     ImVec2            g_grabOffset{ 0.0F, 0.0F };
@@ -132,13 +136,11 @@ namespace
 
     ImGuiMCP::ImU32 Color(const Piece& a_piece, const NT::Settings& a_settings, float a_alpha)
     {
-        ImGuiMCP::ImVec4 color{ a_settings.textColor[0], a_settings.textColor[1], a_settings.textColor[2], a_settings.textColor[3] * a_alpha };
+        const float alpha = a_settings.textColor[3] * a_alpha;
         if (!a_piece.defaultColor) {
-            color.x = static_cast<float>((a_piece.rgb >> 16) & 0xFF) / 255.0F;
-            color.y = static_cast<float>((a_piece.rgb >> 8) & 0xFF) / 255.0F;
-            color.z = static_cast<float>(a_piece.rgb & 0xFF) / 255.0F;
+            return ImGuiMCP::ColorConvertFloat4ToU32(NT::Overlay::RgbColor(a_piece.rgb, alpha));
         }
-        return ImGuiMCP::ColorConvertFloat4ToU32(color);
+        return ImGuiMCP::ColorConvertFloat4ToU32({ a_settings.textColor[0], a_settings.textColor[1], a_settings.textColor[2], alpha });
     }
 
     // Full-screen menus the lines would be drawn over. Checked by name, not
@@ -227,6 +229,123 @@ namespace
         ImGuiMCP::ImDrawListManager::AddText(a_list, a_font, a_size, a_pos, Color(a_piece, a_settings, a_alpha), begin, end);
     }
 
+    struct Block
+    {
+        std::vector<Line> lines;
+        float             alpha;
+    };
+
+    // Text size and spacing for the current screen, scaled from 1080p.
+    struct Metrics
+    {
+        ImGuiMCP::ImFont* font;
+        float             size;
+        float             lineHeight;
+        float             maxWidth;
+    };
+
+    // Horizontal shift that turns the anchor into the left edge of a line
+    // (or block) a_width wide.
+    float AlignOffset(NT::Align a_align, float a_width)
+    {
+        switch (a_align) {
+        case NT::Align::kCenter:
+            return -a_width * 0.5F;
+        case NT::Align::kRight:
+            return -a_width;
+        default:
+            return 0.0F;
+        }
+    }
+
+    // Lays out the entries (or the sample lines while positioning with
+    // nothing to show) in drawing order.
+    std::vector<Block> BuildBlocks(const std::vector<NT::Capture::Entry>& a_entries, bool a_positioning, const Metrics& a_metrics,
+        const NT::Settings& a_settings)
+    {
+        std::vector<Block> blocks;
+        if (a_positioning && a_entries.empty()) {
+            const auto& strings = NT::Translation::S();
+            for (const auto* sample : { &strings.sample1, &strings.sample2, &strings.sample3 }) {
+                blocks.push_back({ Layout(NT::Markup::Parse(*sample), 1, a_metrics.font, a_metrics.size, a_metrics.maxWidth), 1.0F });
+            }
+        } else {
+            for (const auto& entry : a_entries) {
+                blocks.push_back({ Layout(entry.runs, entry.count, a_metrics.font, a_metrics.size, a_metrics.maxWidth), Alpha(entry, a_settings) });
+            }
+        }
+        if (a_settings.newestOnTop) {
+            std::ranges::reverse(blocks);
+        }
+        return blocks;
+    }
+
+    void DrawBlocks(ImGuiMCP::ImDrawList* a_list, const std::vector<Block>& a_blocks, ImVec2 a_anchor, const Metrics& a_metrics,
+        const NT::Settings& a_settings)
+    {
+        float y = a_anchor.y;
+        for (const auto& block : a_blocks) {
+            for (const auto& line : block.lines) {
+                const float x = a_anchor.x + AlignOffset(a_settings.align, line.width);
+                if (a_settings.backgroundAlpha > 0.0F && block.alpha > 0.0F) {
+                    const float pad = a_metrics.size * 0.25F;
+                    ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, { x - pad, y - pad * 0.5F },
+                        { x + line.width + pad, y + a_metrics.size + pad * 0.5F },
+                        ImGuiMCP::ColorConvertFloat4ToU32({ 0.0F, 0.0F, 0.0F, a_settings.backgroundAlpha * block.alpha }), pad, 0);
+                }
+                for (const auto& piece : line.pieces) {
+                    DrawText(a_list, a_metrics.font, a_metrics.size, { x + piece.x, y }, piece, a_settings, block.alpha);
+                }
+                y += a_metrics.lineHeight;
+            }
+        }
+    }
+
+    // Positioning mode: frame around the block; a left-button drag inside it
+    // moves the anchor and saves on release.
+    void HandleDrag(ImGuiMCP::ImDrawList* a_list, const std::vector<Block>& a_blocks, ImVec2 a_anchor, ImVec2 a_screen,
+        const Metrics& a_metrics, NT::Settings& a_settings)
+    {
+        float blockWidth = 0.0F;
+        float blockHeight = 0.0F;
+        for (const auto& block : a_blocks) {
+            for (const auto& line : block.lines) {
+                blockWidth = std::max(blockWidth, line.width);
+                blockHeight += a_metrics.lineHeight;
+            }
+        }
+
+        // Drag handle: the block's bounds (at least a small box at the anchor).
+        const float  width = std::max(blockWidth, kDragMinWidth);
+        const float  height = std::max(blockHeight, a_metrics.lineHeight);
+        const float  left = a_anchor.x + AlignOffset(a_settings.align, width);
+        const ImVec2 min{ left - kDragPadding, a_anchor.y - kDragPadding };
+        const ImVec2 max{ left + width + kDragPadding, a_anchor.y + height + kDragPadding };
+        const auto   mouse = ImGuiMCP::GetMousePos();
+        const bool   inside = mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y;
+        const bool   overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
+
+        if (!g_dragging && inside && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
+            g_dragging = true;
+            g_grabOffset = { mouse.x - a_anchor.x, mouse.y - a_anchor.y };
+        }
+        if (g_dragging) {
+            if (ImGuiMCP::IsMouseDown(0)) {
+                a_settings.posX = std::clamp((mouse.x - g_grabOffset.x) / a_screen.x, 0.0F, 1.0F);
+                a_settings.posY = std::clamp((mouse.y - g_grabOffset.y) / a_screen.y, 0.0F, 1.0F);
+            } else {
+                g_dragging = false;
+                NT::SaveSettings();
+                logs::info("Position set by dragging: {:.4f} / {:.4f}", a_settings.posX, a_settings.posY);
+            }
+        }
+
+        const bool active = g_dragging || (inside && !overWindow);
+        const auto frame = ImGuiMCP::ColorConvertFloat4ToU32({ 1.0F, 0.85F, 0.3F, active ? 1.0F : 0.6F });
+        ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, frame, 4.0F, 0, active ? 2.5F : 1.5F);
+        ImGuiMCP::ImDrawListManager::AddCircleFilled(a_list, a_anchor, 4.0F, frame, 12);
+    }
+
     void __stdcall Render()
     {
         auto* ui = RE::UI::GetSingleton();
@@ -250,107 +369,26 @@ namespace
         }
 
         const float dt = ui->GameIsPaused() && !positioning ? 0.0F : io->DeltaTime;
-        auto        entries = Tick(dt, s);
+        const auto  entries = Tick(dt, s);
 
-        const auto screen = io->DisplaySize;
-        auto*      font = ResolveFont();
-        const float scale = screen.y > 0.0F ? screen.y / 1080.0F : 1.0F;
-        const float size = s.fontSize * scale;
-        const float maxWidth = std::max(50.0F, s.maxWidth * screen.x);
+        const auto  screen = io->DisplaySize;
+        const float scale = screen.y > 0.0F ? screen.y / NT::kReferenceHeight : 1.0F;
+        Metrics     metrics;
+        metrics.font = ResolveFont();
+        metrics.size = s.fontSize * scale;
+        metrics.lineHeight = metrics.size + s.lineSpacing * scale;
+        metrics.maxWidth = std::max(50.0F, s.maxWidth * screen.x);
 
-        struct Block
-        {
-            std::vector<Line> lines;
-            float             alpha;
-        };
-        std::vector<Block> blocks;
-        if (positioning && entries.empty()) {
-            const auto& strings = NT::Translation::S();
-            for (const auto* sample : { &strings.sample1, &strings.sample2, &strings.sample3 }) {
-                blocks.push_back({ Layout(NT::Markup::Parse(*sample), 1, font, size, maxWidth), 1.0F });
-            }
-        } else {
-            for (const auto& entry : entries) {
-                blocks.push_back({ Layout(entry.runs, entry.count, font, size, maxWidth), Alpha(entry, s) });
-            }
-        }
-        if (s.newestOnTop) {
-            std::ranges::reverse(blocks);
-        }
-
-        const float lineHeight = size + s.lineSpacing * scale;
-        float       blockWidth = 0.0F;
-        float       blockHeight = 0.0F;
-        for (const auto& block : blocks) {
-            for (const auto& line : block.lines) {
-                blockWidth = std::max(blockWidth, line.width);
-                blockHeight += lineHeight;
-            }
-        }
-
+        const auto   blocks = BuildBlocks(entries, positioning, metrics, s);
         const ImVec2 anchor{ s.posX * screen.x, s.posY * screen.y };
         auto*        list = ImGuiMCP::GetBackgroundDrawList();
+        DrawBlocks(list, blocks, anchor, metrics, s);
 
-        float y = anchor.y;
-        for (const auto& block : blocks) {
-            for (const auto& line : block.lines) {
-                float x = anchor.x;
-                if (s.align == NT::Align::kCenter) {
-                    x -= line.width * 0.5F;
-                } else if (s.align == NT::Align::kRight) {
-                    x -= line.width;
-                }
-                if (s.backgroundAlpha > 0.0F && block.alpha > 0.0F) {
-                    const float pad = size * 0.25F;
-                    ImGuiMCP::ImDrawListManager::AddRectFilled(list, { x - pad, y - pad * 0.5F }, { x + line.width + pad, y + size + pad * 0.5F },
-                        ImGuiMCP::ColorConvertFloat4ToU32({ 0.0F, 0.0F, 0.0F, s.backgroundAlpha * block.alpha }), pad, 0);
-                }
-                for (const auto& piece : line.pieces) {
-                    DrawText(list, font, size, { x + piece.x, y }, piece, s, block.alpha);
-                }
-                y += lineHeight;
-            }
-        }
-
-        if (!positioning) {
+        if (positioning) {
+            HandleDrag(list, blocks, anchor, screen, metrics, s);
+        } else {
             g_dragging = false;
-            return;
         }
-
-        // Drag handle: the block's bounds (at least a small box at the anchor).
-        const float width = std::max(blockWidth, 160.0F);
-        const float height = std::max(blockHeight, lineHeight);
-        float       left = anchor.x;
-        if (s.align == NT::Align::kCenter) {
-            left -= width * 0.5F;
-        } else if (s.align == NT::Align::kRight) {
-            left -= width;
-        }
-        const ImVec2 min{ left - 6.0F, anchor.y - 6.0F };
-        const ImVec2 max{ left + width + 6.0F, anchor.y + height + 6.0F };
-        const auto   mouse = ImGuiMCP::GetMousePos();
-        const bool   inside = mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y;
-        const bool   overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
-
-        if (!g_dragging && inside && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
-            g_dragging = true;
-            g_grabOffset = { mouse.x - anchor.x, mouse.y - anchor.y };
-        }
-        if (g_dragging) {
-            if (ImGuiMCP::IsMouseDown(0)) {
-                s.posX = std::clamp((mouse.x - g_grabOffset.x) / screen.x, 0.0F, 1.0F);
-                s.posY = std::clamp((mouse.y - g_grabOffset.y) / screen.y, 0.0F, 1.0F);
-            } else {
-                g_dragging = false;
-                NT::SaveSettings();
-                logs::info("Position set by dragging: {:.4f} / {:.4f}", s.posX, s.posY);
-            }
-        }
-
-        const bool active = g_dragging || (inside && !overWindow);
-        const auto frame = ImGuiMCP::ColorConvertFloat4ToU32({ 1.0F, 0.85F, 0.3F, active ? 1.0F : 0.6F });
-        ImGuiMCP::ImDrawListManager::AddRect(list, min, max, frame, 4.0F, 0, active ? 2.5F : 1.5F);
-        ImGuiMCP::ImDrawListManager::AddCircleFilled(list, anchor, 4.0F, frame, 12);
     }
 }
 

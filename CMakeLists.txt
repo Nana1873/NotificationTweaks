@@ -29,3 +29,11 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE external/skse-menu-framework)
 target_precompile_headers(${PROJECT_NAME} PRIVATE src/PCH.h)
+
+# Unit tests for the pure modules (no CommonLibSSE); tools\build.ps1 runs them.
+add_executable(NotificationTweaksTests tests/Tests.cpp src/Merge.cpp src/Markup.cpp)
+target_compile_features(NotificationTweaksTests PRIVATE cxx_std_23)
+target_compile_options(NotificationTweaksTests PRIVATE /Zc:preprocessor /permissive- /W4 /utf-8)
+target_compile_definitions(NotificationTweaksTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_include_directories(NotificationTweaksTests PRIVATE src)
+target_precompile_headers(NotificationTweaksTests PRIVATE tests/TestPCH.h)

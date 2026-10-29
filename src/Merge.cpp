@@ -1,32 +1,26 @@
 #include "Merge.h"
 
 #include "Markup.h"
+#include "Text.h"
 
 namespace
 {
     constexpr std::uint32_t kBosColor = 0xFF00FF;
 
+    // ypsThoughts.psc never splits before this byte position.
+    constexpr std::size_t kYpsMinSplit = 30;
+
+    // YPS thought entries start with a sound tag "[nnnnn]".
+    constexpr std::size_t kSoundTagLength = 7;
+
+    // Only thoughts longer than this are stored. YPS's default limit is 80,
+    // so shorter ones are never split. With a YPSLimit under 60, split
+    // thoughts of 31 to 60 bytes merge only when they also pass the
+    // narration check in IsYpsSplit (no markup, mid-sentence, lowercase).
+    constexpr std::size_t kMinStoredThought = 60;
+
     // Full YPS thoughts (sound prefix "[nnnnn]" removed) long enough to be split.
     std::unordered_set<std::string> g_ypsThoughts;
-
-    void AppendUtf8(std::uint32_t a_code, std::string& a_out)
-    {
-        if (a_code < 0x80) {
-            a_out += static_cast<char>(a_code);
-        } else if (a_code < 0x800) {
-            a_out += static_cast<char>(0xC0 | (a_code >> 6));
-            a_out += static_cast<char>(0x80 | (a_code & 0x3F));
-        } else if (a_code < 0x10000) {
-            a_out += static_cast<char>(0xE0 | (a_code >> 12));
-            a_out += static_cast<char>(0x80 | ((a_code >> 6) & 0x3F));
-            a_out += static_cast<char>(0x80 | (a_code & 0x3F));
-        } else {
-            a_out += static_cast<char>(0xF0 | (a_code >> 18));
-            a_out += static_cast<char>(0x80 | ((a_code >> 12) & 0x3F));
-            a_out += static_cast<char>(0x80 | ((a_code >> 6) & 0x3F));
-            a_out += static_cast<char>(0x80 | (a_code & 0x3F));
-        }
-    }
 
     // Exactly four hex digits.
     bool Hex4(std::string_view a_digits, std::uint32_t& a_out)
@@ -78,7 +72,7 @@ namespace
                                 i += 6;
                             }
                             if (code < 0xD800 || code >= 0xE000) {
-                                AppendUtf8(code, value);  // a lone surrogate is dropped
+                                NT::Text::AppendUtf8(code, value);  // a lone surrogate is dropped
                             }
                         }
                         break;
@@ -88,31 +82,20 @@ namespace
                     break;
                 }
             }
-            if (value.size() > 7 && value[0] == '[' && value[6] == ']') {
-                value.erase(0, 7);
+            if (value.size() > kSoundTagLength && value[0] == '[' && value[kSoundTagLength - 1] == ']') {
+                value.erase(0, kSoundTagLength);
             }
-            if (value.size() > 60) {
+            if (value.size() > kMinStoredThought) {
                 a_out.insert(std::move(value));
             }
         }
-    }
-
-    std::string_view Trim(std::string_view a_text)
-    {
-        while (!a_text.empty() && (a_text.front() == ' ' || a_text.front() == '\t')) {
-            a_text.remove_prefix(1);
-        }
-        while (!a_text.empty() && (a_text.back() == ' ' || a_text.back() == '\t')) {
-            a_text.remove_suffix(1);
-        }
-        return a_text;
     }
 
     // '.', '!', '?', ':' and the UTF-8 ellipsis end a sentence; a closing
     // quote or bracket after them still counts.
     bool EndsSentence(std::string_view a_visible)
     {
-        auto text = Trim(a_visible);
+        auto text = NT::Text::Trim(a_visible);
         while (!text.empty() && (text.back() == '"' || text.back() == '\'' || text.back() == ')' || text.back() == '*')) {
             text.remove_suffix(1);
         }
@@ -128,7 +111,7 @@ namespace
 
     bool StartsLowercase(std::string_view a_visible)
     {
-        const auto text = Trim(a_visible);
+        const auto text = NT::Text::Trim(a_visible);
         if (text.empty()) {
             return false;
         }
@@ -156,7 +139,7 @@ namespace NT::Merge
 {
     std::size_t YpsSplitPos(std::string_view a_text)
     {
-        auto split = std::max<std::size_t>(30, a_text.size() / 2 > 3 ? a_text.size() / 2 - 3 : 0);
+        auto split = std::max<std::size_t>(kYpsMinSplit, a_text.size() / 2 > 3 ? a_text.size() / 2 - 3 : 0);
         while (split < a_text.size() && a_text[split] != ' ') {
             ++split;
         }
@@ -165,7 +148,7 @@ namespace NT::Merge
 
     bool IsYpsSplit(std::string_view a_first, std::string_view a_second, int a_limit)
     {
-        if (a_first.size() < 30 || a_second.empty()) {
+        if (a_first.size() < kYpsMinSplit || a_second.empty()) {
             return false;
         }
         const std::string full = std::string(a_first) + " " + std::string(a_second);
@@ -230,6 +213,6 @@ namespace NT::Merge
             const auto open = a_first.substr(0, a_first.find('>') + 1);
             return std::string(open) + Inner(a_first) + " " + Inner(a_second) + "</font>";
         }
-        return std::string(Trim(a_first)) + " " + std::string(Trim(a_second));
+        return std::string(NT::Text::Trim(a_first)) + " " + std::string(NT::Text::Trim(a_second));
     }
 }

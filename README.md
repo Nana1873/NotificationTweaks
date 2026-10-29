@@ -65,7 +65,8 @@ git submodule update --init --recursive
 ```
 
 Needs Visual Studio with the C++ workload, CMake, Ninja and vcpkg
-(`VCPKG_ROOT`). Output: `build\release\NotificationTweaks.dll`.
+(`VCPKG_ROOT`). Output: `build\release\NotificationTweaks.dll`; the build
+also runs the unit tests in `tests\` and fails if one does.
 `tools\package.ps1` builds the release archive in `dist\`;
 `tools\deploy.ps1` is the author's helper that copies a build into an MO2
 mod folder (`-Instance`, `-ModName`).

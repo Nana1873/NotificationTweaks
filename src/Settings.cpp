@@ -1,5 +1,7 @@
 #include "Settings.h"
 
+#include "Text.h"
+
 namespace
 {
     // Relative to the game CWD; resolved to an absolute path because the
@@ -48,7 +50,7 @@ namespace
         return buf;
     }
 
-    float ReadFloat(const char* a_section, const char* a_key, float a_default, float a_min, float a_max, const std::string& a_path)
+    float ReadFloat(const char* a_section, const char* a_key, float a_default, NT::Range<float> a_range, const std::string& a_path)
     {
         const auto text = ReadString(a_section, a_key, "", a_path);
         float      value = a_default;
@@ -58,12 +60,12 @@ namespace
                 value = a_default;
             }
         }
-        return std::clamp(value, a_min, a_max);
+        return std::clamp(value, a_range.min, a_range.max);
     }
 
-    int ReadInt(const char* a_section, const char* a_key, int a_default, int a_min, int a_max, const std::string& a_path)
+    int ReadInt(const char* a_section, const char* a_key, int a_default, NT::Range<int> a_range, const std::string& a_path)
     {
-        return std::clamp(static_cast<int>(GetPrivateProfileIntA(a_section, a_key, a_default, a_path.c_str())), a_min, a_max);
+        return std::clamp(static_cast<int>(GetPrivateProfileIntA(a_section, a_key, a_default, a_path.c_str())), a_range.min, a_range.max);
     }
 
     bool ReadBool(const char* a_section, const char* a_key, bool a_default, const std::string& a_path)
@@ -92,37 +94,6 @@ namespace
         WritePrivateProfileStringA(a_section, a_key, a_value.c_str(), a_path.c_str());
     }
 
-    // The profile A-API converts through the system ANSI codepage, which
-    // breaks UTF-8 on DBCS locales; "%XX" keeps [Hidden] values ASCII.
-    std::string Escape(std::string_view a_text)
-    {
-        std::string out;
-        for (const char c : a_text) {
-            const auto byte = static_cast<unsigned char>(c);
-            if (byte >= 0x80 || byte < 0x20 || c == '%') {
-                out += std::format("%{:02X}", byte);
-            } else {
-                out += c;
-            }
-        }
-        return out;
-    }
-
-    std::string Unescape(std::string_view a_text)
-    {
-        std::string out;
-        for (std::size_t i = 0; i < a_text.size(); ++i) {
-            std::uint8_t byte = 0;
-            if (a_text[i] == '%' && i + 3 <= a_text.size() &&
-                std::from_chars(a_text.data() + i + 1, a_text.data() + i + 3, byte, 16).ptr == a_text.data() + i + 3) {
-                out += static_cast<char>(byte);
-                i += 2;
-            } else {
-                out += a_text[i];
-            }
-        }
-        return out;
-    }
 }
 
 namespace NT
@@ -141,35 +112,33 @@ namespace NT
         s.enabled = ReadBool("General", "Enabled", d.enabled, path);
         s.verboseLog = ReadBool("General", "VerboseLog", d.verboseLog, path);
 
-        s.posX = ReadFloat("Layout", "PosX", d.posX, 0.0F, 1.0F, path);
-        s.posY = ReadFloat("Layout", "PosY", d.posY, 0.0F, 1.0F, path);
-        s.align = static_cast<Align>(ReadInt("Layout", "Align", static_cast<int>(d.align), 0, 2, path));
+        s.posX = ReadFloat("Layout", "PosX", d.posX, Limits::kPos, path);
+        s.posY = ReadFloat("Layout", "PosY", d.posY, Limits::kPos, path);
+        s.align = static_cast<Align>(ReadInt("Layout", "Align", static_cast<int>(d.align), { 0, 2 }, path));
         s.newestOnTop = ReadBool("Layout", "NewestOnTop", d.newestOnTop, path);
-        s.maxWidth = ReadFloat("Layout", "MaxWidth", d.maxWidth, 0.1F, 1.0F, path);
-        s.maxVisible = ReadInt("Layout", "MaxVisible", d.maxVisible, 1, 20, path);
+        s.maxWidth = ReadFloat("Layout", "MaxWidth", d.maxWidth, Limits::kMaxWidth, path);
+        s.maxVisible = ReadInt("Layout", "MaxVisible", d.maxVisible, Limits::kMaxVisible, path);
         s.showInMenus = ReadBool("Layout", "ShowInMenus", d.showInMenus, path);
 
         s.font = ReadString("Style", "Font", d.font, path);
-        // "...1080" keys: older test builds stored absolute pixels under
-        // FontSize/LineSpacing; those are not read, SaveSettings removes them.
-        s.fontSize = ReadFloat("Style", "FontSize1080", d.fontSize, 8.0F, 72.0F, path);
-        s.lineSpacing = ReadFloat("Style", "LineSpacing1080", d.lineSpacing, 0.0F, 30.0F, path);
+        s.fontSize = ReadFloat("Style", "FontSize1080", d.fontSize, Limits::kFontSize, path);
+        s.lineSpacing = ReadFloat("Style", "LineSpacing1080", d.lineSpacing, Limits::kLineSpacing, path);
         ReadColor("Style", "TextColor", s.textColor, path);
-        s.effect = static_cast<TextEffect>(ReadInt("Style", "Effect", static_cast<int>(d.effect), 0, 2, path));
-        s.backgroundAlpha = ReadFloat("Style", "BackgroundAlpha", d.backgroundAlpha, 0.0F, 1.0F, path);
+        s.effect = static_cast<TextEffect>(ReadInt("Style", "Effect", static_cast<int>(d.effect), { 0, 2 }, path));
+        s.backgroundAlpha = ReadFloat("Style", "BackgroundAlpha", d.backgroundAlpha, Limits::kBackground, path);
 
         s.immediate = ReadBool("Timing", "Immediate", d.immediate, path);
-        s.queueDelay = ReadFloat("Timing", "QueueDelay", d.queueDelay, 0.1F, 5.0F, path);
-        s.duration = ReadFloat("Timing", "Duration", d.duration, 0.5F, 30.0F, path);
-        s.fadeIn = ReadFloat("Timing", "FadeIn", d.fadeIn, 0.0F, 3.0F, path);
-        s.fadeOut = ReadFloat("Timing", "FadeOut", d.fadeOut, 0.0F, 5.0F, path);
+        s.queueDelay = ReadFloat("Timing", "QueueDelay", d.queueDelay, Limits::kQueueDelay, path);
+        s.duration = ReadFloat("Timing", "Duration", d.duration, Limits::kDuration, path);
+        s.fadeIn = ReadFloat("Timing", "FadeIn", d.fadeIn, Limits::kFadeIn, path);
+        s.fadeOut = ReadFloat("Timing", "FadeOut", d.fadeOut, Limits::kFadeOut, path);
         s.stackDuplicates = ReadBool("Timing", "StackDuplicates", d.stackDuplicates, path);
 
         s.mergeYps = ReadBool("Compatibility", "MergeYPS", d.mergeYps, path);
         s.mergeBos = ReadBool("Compatibility", "MergeBoS", d.mergeBos, path);
         s.mergeGeneric = ReadBool("Compatibility", "MergeGeneric", d.mergeGeneric, path);
-        s.mergeWindow = ReadFloat("Compatibility", "MergeWindow", d.mergeWindow, 0.05F, 2.0F, path);
-        s.ypsLimit = ReadInt("Compatibility", "YPSLimit", d.ypsLimit, 30, 1000, path);
+        s.mergeWindow = ReadFloat("Compatibility", "MergeWindow", d.mergeWindow, Limits::kMergeWindow, path);
+        s.ypsLimit = ReadInt("Compatibility", "YPSLimit", d.ypsLimit, Limits::kYpsLimit, path);
 
         PublishCapture();
         logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {})", path,
@@ -204,8 +173,6 @@ namespace NT
         Write("Style", "Font", s.font, path);
         Write("Style", "FontSize1080", f(s.fontSize), path);
         Write("Style", "LineSpacing1080", f(s.lineSpacing), path);
-        WritePrivateProfileStringA("Style", "FontSize", nullptr, path.c_str());
-        WritePrivateProfileStringA("Style", "LineSpacing", nullptr, path.c_str());
         Write("Style", "TextColor", std::format("{:08X}", rgba), path);
         Write("Style", "Effect", std::to_string(static_cast<int>(s.effect)), path);
         Write("Style", "BackgroundAlpha", f(s.backgroundAlpha), path);
@@ -225,6 +192,21 @@ namespace NT
         PublishCapture();
     }
 
+    void ResetDisplaySettings()
+    {
+        auto&          s = g_settings;
+        const Settings keep = s;
+        s = Settings{};
+        s.enabled = keep.enabled;
+        s.verboseLog = keep.verboseLog;
+        s.mergeYps = keep.mergeYps;
+        s.mergeBos = keep.mergeBos;
+        s.mergeGeneric = keep.mergeGeneric;
+        s.mergeWindow = keep.mergeWindow;
+        s.ypsLimit = keep.ypsLimit;
+        SaveSettings();
+    }
+
     CaptureSettings CaptureConfig()
     {
         std::scoped_lock lock{ g_captureLock };
@@ -239,10 +221,10 @@ namespace NT
     std::vector<std::string> ReadHiddenKeys()
     {
         const auto               path = IniPath();
-        const int                count = ReadInt("Hidden", "Count", 0, 0, 10000, path);
+        const int                count = ReadInt("Hidden", "Count", 0, { 0, 10000 }, path);
         std::vector<std::string> keys;
         for (int i = 1; i <= count; ++i) {
-            if (auto key = Unescape(ReadString("Hidden", std::format("Line{}", i).c_str(), "", path)); !key.empty()) {
+            if (auto key = NT::Text::PercentUnescape(ReadString("Hidden", std::format("Line{}", i).c_str(), "", path)); !key.empty()) {
                 keys.push_back(std::move(key));
             }
         }
@@ -262,7 +244,7 @@ namespace NT
         std::string lines;
         int         count = 0;
         for (const auto& key : a_keys) {
-            const auto value = Escape(key);
+            const auto value = NT::Text::PercentEscape(key);
             if (value.size() > kMaxHiddenValue) {
                 logs::warn("Hidden line too long to save ({} bytes), kept for this session only", value.size());
                 continue;

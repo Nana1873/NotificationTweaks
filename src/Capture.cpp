@@ -1,6 +1,7 @@
 #include "Capture.h"
 
 #include "Settings.h"
+#include "Text.h"
 #include "Translation.h"
 
 namespace
@@ -9,12 +10,12 @@ namespace
     std::deque<NT::Capture::Entry>        g_entries;
     std::deque<NT::Capture::HistoryEntry> g_history;
     std::uint64_t                         g_nextID = 1;
-    std::set<std::string>                 g_hidden;  // hide keys, see NT::Capture::HideKey
+    std::set<std::string>                 g_hidden;  // hide keys, see NT::Text::HideKey
 
     // Caller holds g_lock.
     bool IsHidden(std::string_view a_raw)
     {
-        return !g_hidden.empty() && g_hidden.contains(NT::Capture::HideKey(NT::Markup::Visible(a_raw)));
+        return !g_hidden.empty() && g_hidden.contains(NT::Text::HideKey(NT::Markup::Visible(a_raw)));
     }
 
     // Caller holds g_lock. A line that stops being hidden starts over, so it
@@ -263,7 +264,7 @@ namespace NT::Capture
         g_entries.push_back(std::move(entry));
 
         // Keep memory bounded when the HUD is hidden for a long time.
-        while (g_entries.size() > 64) {
+        while (g_entries.size() > NT::Capture::kMaxPendingEntries) {
             g_entries.pop_front();
         }
     }
@@ -293,26 +294,6 @@ namespace NT::Capture
     {
         std::scoped_lock lock{ g_lock };
         g_history.clear();
-    }
-
-    std::string HideKey(std::string_view a_visible)
-    {
-        std::string key;
-        key.reserve(a_visible.size());
-        for (std::size_t i = 0; i < a_visible.size(); ++i) {
-            // ASCII only: std::isdigit depends on the CRT locale and can
-            // match UTF-8 continuation bytes (0xB2, 0xB3, 0xB9 in cp1252).
-            const auto digit = [&](std::size_t a_pos) { return a_visible[a_pos] >= '0' && a_visible[a_pos] <= '9'; };
-            if (digit(i)) {
-                key += '#';
-                while (i + 1 < a_visible.size() && digit(i + 1)) {
-                    ++i;
-                }
-            } else {
-                key += a_visible[i];
-            }
-        }
-        return key;
     }
 
     void LoadHidden()

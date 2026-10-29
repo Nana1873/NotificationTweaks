@@ -61,13 +61,19 @@ mutex.
 
 - `tools\build.ps1` builds `build\release\NotificationTweaks.dll` (CMake,
   Ninja, vcpkg via `VCPKG_ROOT`, CommonLibSSE-NG submodule
-  `extern/commonlibsse-ng`; Visual Studio is found through vswhere).
+  `extern/commonlibsse-ng`; Visual Studio is found through vswhere), then
+  runs `NotificationTweaksTests.exe` (`tests/Tests.cpp`: merge rules,
+  markup, hide keys, INI escaping); a failing check fails the build. This
+  is the local check before commit.
 - `tools\deploy.ps1 [-Register]` copies DLL, PDB and translations into the
   SkyrimAE mod `houseCARL - Notification Tweaks Dev`; `-Register` adds it to
   `modlist.txt` and refuses while MO2 runs. Quit the game first: it keeps
   the DLL and the build PDB open.
 - `tools\package.ps1` writes `dist\NotificationTweaks-<version>.zip` for
-  Nexus (DLL, translations, license, third-party notices; no PDB).
+  Nexus (DLL, translations, license, third-party notices; no PDB). It
+  refuses when CMakeLists.txt and vcpkg.json disagree on the version, the
+  generated string files are stale (`strings.py --check`) or the DLL is
+  older than `src/`.
 - `python -I tools\strings.py` regenerates `src/Translation.h`, the
   `LoadStrings()` body and both translation files from one table.
 

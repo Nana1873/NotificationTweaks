@@ -114,6 +114,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 
 ## Testing notes
 
+- Unit tests (`tests/Tests.cpp`, built and run by `tools/build.ps1`) cover
+  the pure code: YPS/BoS/generic merge rules, markup parsing and entities,
+  the 1252 fallback, hide keys and the `[Hidden]` escaping. They link
+  `Merge.cpp` and `Markup.cpp` against `tests/TestPCH.h` (no CommonLibSSE,
+  `logs::` is a no-op). Hooks, overlay and menu stay in-game tests.
 - `tools/deploy.ps1 [-Register]`, then
   `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Loading the save
   by name only works once the data is loaded; the test save asks about
@@ -125,4 +130,7 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 - The running game keeps `build/release/NotificationTweaks.pdb` open
   (dbghelp follows the embedded path): quit the game before linking.
 - The SMF cursor follows relative raw mouse input; driving it from outside
-  with absolute moves is unreliable, so drag tests are manual.
+  with absolute moves is unreliable, so drag tests are manual. Clicks on
+  menu items work with Windows-MCP absolute clicks on the game monitor, but
+  ImGui may register a click at the previous cursor position, so click the
+  same spot twice when one seems to be missed.

@@ -1,6 +1,6 @@
 #include "Translation.h"
 
-#include "StringConv.h"
+#include "Text.h"
 
 #include <RE/B/BSResourceNiBinaryStream.h>
 #include <RE/I/INISettingCollection.h>
@@ -12,20 +12,11 @@ namespace
 
     // Our own table for the files Import() parses. Never insert into the
     // engine's Scaleform table: InitTESThread may be rebuilding it, which
-    // intermittently crashed startup (see design-notes, 2026-10-27).
+    // intermittently crashed startup (design-notes, "Settings and strings").
     // Written only at kDataLoaded, read-only afterwards. Keys are stored
     // lowercased: the engine table this replaces matched case-insensitively
     // (interned BSFixedStringW), and mod files rely on that.
     std::unordered_map<std::string, std::string> g_table;
-
-    std::string LowerKey(std::string_view a_key)
-    {
-        auto wide = NT::Text::ToWide(a_key);
-        if (!wide.empty()) {
-            ::CharLowerBuffW(wide.data(), static_cast<DWORD>(wide.size()));
-        }
-        return NT::Text::ToUtf8(wide);
-    }
 
     std::string GameLanguage()
     {
@@ -116,14 +107,12 @@ namespace
 
     std::optional<std::string> Lookup(std::string_view a_key)
     {
-        if (const auto it = g_table.find(LowerKey(a_key)); it != g_table.end()) {
+        if (const auto it = g_table.find(NT::Text::Lower(a_key)); it != g_table.end()) {
             return it->second;
         }
 
-        // Then the translator's virtual Translate(),
-        // exactly what Scaleform calls for "$Key" strings in menus. It
-        // covers the engine's own table (interface/translate_<lang>.txt),
-        // which is not necessarily visible in translationMap.
+        // Then the translator's virtual Translate(), exactly what Scaleform
+        // calls for "$Key" strings in menus.
         if (std::string result; SKSE::Translation::Translate(std::string(a_key), result) && !result.empty() &&
                                 result != a_key) {
             return result;
@@ -138,9 +127,11 @@ namespace
             return std::nullopt;
         }
         const auto& map = translator->translator.translationMap;
-        // The engine's own table (interface/translate_<lang>.txt) and the
-        // SKSE-imported plugin files may key entries differently ("$Effects"
-        // vs "Effects"), so try the key as given and without its '$'.
+        // Last, translationMap directly: the engine's own table
+        // (interface/translate_<lang>.txt) and SKSE-imported plugin files may
+        // key entries differently ("$Effects" vs "Effects"), which
+        // Translate() does not try, so look up the key as given and without
+        // its '$'.
         for (const auto candidate : { a_key, a_key.substr(1) }) {
             if (candidate.empty()) {
                 continue;

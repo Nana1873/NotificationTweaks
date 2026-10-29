@@ -1,8 +1,10 @@
 # Single source for the UI strings: generates src/Translation.h, the
 # LoadStrings() body in src/Translation.cpp and the UTF-16 translation files.
-# Usage: python -I tools/strings.py
+# Usage: python -I tools/strings.py [--check]
+# --check writes nothing and fails when a generated file is out of date.
 import pathlib
 import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -115,7 +117,8 @@ header = [
 for name, en, _ in STRINGS:
     header.append(f'        std::string {name} = "{cpp_escape(en)}";')
 header += ["    };", "", "    void           LoadStrings();", "    const Strings& S();", "}", ""]
-(ROOT / "src/Translation.h").write_text("\n".join(header), encoding="utf-8")
+outputs = {}  # path -> (bytes, compare as text)
+outputs[ROOT / "src/Translation.h"] = ("\n".join(header).encode("utf-8"), True)
 
 body = ["    void LoadStrings()", "    {", "        Strings defaults;"]
 for name, _, _ in STRINGS:
@@ -123,12 +126,34 @@ for name, _, _ in STRINGS:
 body += ["        logs::info(\"UI strings loaded ('{}')\", g_strings.pageDisplay);", "    }", ""]
 cpp_path = ROOT / "src/Translation.cpp"
 cpp = cpp_path.read_text(encoding="utf-8")
-cpp = re.sub(r"(@@LOADSTRINGS@@\n|    void LoadStrings\(\)\n    \{.*?\n    \}\n\n)", lambda m: "\n".join(body) + "\n", cpp, count=1, flags=re.S)
-cpp_path.write_text(cpp, encoding="utf-8")
+cpp, replaced = re.subn(r"(@@LOADSTRINGS@@\n|    void LoadStrings\(\)\n    \{.*?\n    \}\n\n)", lambda m: "\n".join(body) + "\n", cpp, count=1, flags=re.S)
+assert replaced == 1, "LoadStrings() body not found in src/Translation.cpp"
+outputs[cpp_path] = (cpp.encode("utf-8"), True)
 
 out = ROOT / "config/Interface/Translations"
-out.mkdir(parents=True, exist_ok=True)
 for lang, idx in (("ENGLISH", 1), ("GERMAN", 2)):
     lines = [f"{key(e[0])}\t{e[idx]}" for e in STRINGS]
-    (out / f"NotificationTweaks_{lang}.txt").write_bytes(b"\xff\xfe" + ("\r\n".join(lines) + "\r\n").encode("utf-16-le"))
+    outputs[out / f"NotificationTweaks_{lang}.txt"] = (b"\xff\xfe" + ("\r\n".join(lines) + "\r\n").encode("utf-16-le"), False)
+
+if "--check" in sys.argv:
+    # Generated files must match the table (package.ps1 runs this).
+    stale = []
+    for path, (data, text) in outputs.items():
+        current = path.read_bytes() if path.exists() else b""
+        if text:
+            current, data = current.replace(b"\r\n", b"\n"), data.replace(b"\r\n", b"\n")
+        if current != data:
+            stale.append(str(path.relative_to(ROOT)))
+    if stale:
+        print("Out of date, run python -I tools/strings.py: " + ", ".join(stale))
+        sys.exit(1)
+    print(f"{len(STRINGS)} strings, generated files up to date")
+    sys.exit(0)
+
+out.mkdir(parents=True, exist_ok=True)
+for path, (data, text) in outputs.items():
+    if text:
+        path.write_text(data.decode("utf-8"), encoding="utf-8")
+    else:
+        path.write_bytes(data)
 print(f"{len(STRINGS)} strings written")

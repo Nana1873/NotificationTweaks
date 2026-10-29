@@ -19,6 +19,34 @@ namespace NT
         kOutline = 2
     };
 
+    template <class T>
+    struct Range
+    {
+        T min;
+        T max;
+    };
+
+    // Allowed values: LoadSettings clamps the INI to them and the menu's
+    // sliders use the same bounds.
+    namespace Limits
+    {
+        inline constexpr Range<float> kPos{ 0.0F, 1.0F };
+        inline constexpr Range<float> kMaxWidth{ 0.1F, 1.0F };
+        inline constexpr Range<int>   kMaxVisible{ 1, 20 };
+        inline constexpr Range<float> kFontSize{ 8.0F, 72.0F };
+        inline constexpr Range<float> kLineSpacing{ 0.0F, 30.0F };
+        inline constexpr Range<float> kBackground{ 0.0F, 1.0F };
+        inline constexpr Range<float> kQueueDelay{ 0.1F, 5.0F };
+        inline constexpr Range<float> kDuration{ 0.5F, 30.0F };
+        inline constexpr Range<float> kFadeIn{ 0.0F, 3.0F };
+        inline constexpr Range<float> kFadeOut{ 0.0F, 5.0F };
+        inline constexpr Range<float> kMergeWindow{ 0.05F, 2.0F };
+        inline constexpr Range<int>   kYpsLimit{ 30, 1000 };
+    }
+
+    // Font size and line spacing are stored as pixels at this screen height.
+    inline constexpr float kReferenceHeight = 1080.0F;
+
     struct Settings
     {
         // [General]
@@ -84,13 +112,17 @@ namespace NT
     void      LoadSettings();
     void      SaveSettings();
 
+    // Menu reset: display, layout and timing back to defaults; the switch,
+    // logging and the compatibility rules stay. Saves.
+    void ResetDisplaySettings();
+
     // Any thread: a copy of the capture values as last loaded or saved.
     CaptureSettings CaptureConfig();
 
     // Any thread, lock-free: CaptureConfig().enabled, for the per-frame hooks.
     bool CaptureEnabled();
 
-    // [Hidden]: the hide keys (Capture::HideKey) of lines the player hid in
+    // [Hidden]: the hide keys (Text::HideKey) of lines the player hid in
     // the HUD. Capture owns the live set and calls these.
     std::vector<std::string> ReadHiddenKeys();
     void                     WriteHiddenKeys(const std::vector<std::string>& a_keys);

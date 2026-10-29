@@ -1,5 +1,7 @@
 #include "Markup.h"
 
+#include "Text.h"
+
 namespace
 {
     bool IsValidUtf8(std::string_view a_text)
@@ -79,20 +81,8 @@ namespace
             const bool    hex = a_entity.size() > 2 && (a_entity[1] == 'x' || a_entity[1] == 'X');
             const auto    digits = a_entity.substr(hex ? 2 : 1);
             if (std::from_chars(digits.data(), digits.data() + digits.size(), code, hex ? 16 : 10).ec == std::errc{} && code > 0 &&
-                code < 0x110000) {
-                wchar_t wide[2]{};
-                int     count = 1;
-                if (code >= 0x10000) {
-                    code -= 0x10000;
-                    wide[0] = static_cast<wchar_t>(0xD800 + (code >> 10));
-                    wide[1] = static_cast<wchar_t>(0xDC00 + (code & 0x3FF));
-                    count = 2;
-                } else {
-                    wide[0] = static_cast<wchar_t>(code);
-                }
-                char utf8[8]{};
-                const auto len = WideCharToMultiByte(CP_UTF8, 0, wide, count, utf8, static_cast<int>(sizeof(utf8)), nullptr, nullptr);
-                a_out.append(utf8, static_cast<std::size_t>(std::max(len, 0)));
+                code < 0x110000 && (code < 0xD800 || code >= 0xE000)) {
+                NT::Text::AppendUtf8(code, a_out);
                 return;
             }
         }
@@ -206,13 +196,7 @@ namespace NT::Markup
 
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw)
     {
-        auto trimmed = a_raw;
-        while (!trimmed.empty() && trimmed.front() == ' ') {
-            trimmed.remove_prefix(1);
-        }
-        while (!trimmed.empty() && trimmed.back() == ' ') {
-            trimmed.remove_suffix(1);
-        }
+        const auto trimmed = NT::Text::Trim(a_raw);
         const auto lower = Lower(trimmed);
         if (!lower.starts_with("<font") || !lower.ends_with("</font>")) {
             return std::nullopt;

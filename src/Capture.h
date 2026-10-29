@@ -32,7 +32,11 @@ namespace NT::Capture
         int                                   count = 1;
     };
 
+    // Keep in step with historyHint in tools/strings.py ("The last 100 ...").
     inline constexpr std::size_t kHistorySize = 100;
+
+    // Pending lines kept while nothing draws them (HUD hidden for long).
+    inline constexpr std::size_t kMaxPendingEntries = 64;
 
     // Writes the vtable hooks. Called once at kDataLoaded, only when the SKSE
     // Menu Framework is present (without it nothing could draw the text).
@@ -53,10 +57,8 @@ namespace NT::Capture
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor);
     void ClearHistory();
 
-    // Hiding: a line whose visible text matches a hide key still enters the
-    // history but is not drawn. The key is the visible text with every run
-    // of digits replaced by "#", so "25 Gold added" also hides "30 Gold added".
-    std::string           HideKey(std::string_view a_visible);
+    // Hiding: a line whose visible text matches a hide key (Text::HideKey)
+    // still enters the history but is not drawn.
     void                  LoadHidden();  // startup, after LoadSettings
     std::set<std::string> HiddenKeys();
     void                  SetHidden(const std::string& a_key, bool a_hidden);  // saves; applies to live lines too

@@ -5,7 +5,7 @@
 #include "Overlay.h"
 #include "SKSEMenuFramework.h"
 #include "Settings.h"
-#include "StringConv.h"
+#include "Text.h"
 #include "Translation.h"
 
 namespace
@@ -43,18 +43,18 @@ namespace
     }
 
     // Slider showing a 0..1 fraction as percent.
-    void PercentSlider(const std::string& a_label, const char* a_id, float& a_value, float a_min, float a_max)
+    void PercentSlider(const std::string& a_label, const char* a_id, float& a_value, NT::Range<float> a_range)
     {
         float percent = a_value * 100.0F;
-        if (ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &percent, a_min * 100.0F, a_max * 100.0F, "%.1f%%", kClamp)) {
+        if (ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &percent, a_range.min * 100.0F, a_range.max * 100.0F, "%.1f%%", kClamp)) {
             a_value = percent / 100.0F;
         }
         Commit();
     }
 
-    void SecondsSlider(const std::string& a_label, const char* a_id, float& a_value, float a_min, float a_max)
+    void SecondsSlider(const std::string& a_label, const char* a_id, float& a_value, NT::Range<float> a_range)
     {
-        ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &a_value, a_min, a_max, "%.2f s", kClamp);
+        ImGuiMCP::SliderFloat((a_label + a_id).c_str(), &a_value, a_range.min, a_range.max, "%.2f s", kClamp);
         Commit();
     }
 
@@ -130,8 +130,8 @@ namespace
         if (ImGuiMCP::Begin((t.posWindowTitle + "###NTPosition").c_str(), &open,
                 ImGuiMCP::ImGuiWindowFlags_AlwaysAutoResize | ImGuiMCP::ImGuiWindowFlags_NoCollapse)) {
             ImGuiMCP::TextUnformatted(t.posWindowHint.c_str());
-            PercentSlider(t.posX, "##posx", s.posX, 0.0F, 1.0F);
-            PercentSlider(t.posY, "##posy", s.posY, 0.0F, 1.0F);
+            PercentSlider(t.posX, "##posx", s.posX, NT::Limits::kPos);
+            PercentSlider(t.posY, "##posy", s.posY, NT::Limits::kPos);
             int align = static_cast<int>(s.align);
             if (Combo(t.align, "##palign", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
                 s.align = static_cast<NT::Align>(align);
@@ -155,18 +155,7 @@ namespace
         if (ImGuiMCP::Button(((armed ? t.resetConfirm : t.resetDisplay) + "##reset").c_str())) {
             if (armed) {
                 g_confirmUntil = 0.0;
-                auto&              s = NT::Config();
-                const NT::Settings d;
-                const auto         keep = s;
-                s = d;
-                s.enabled = keep.enabled;
-                s.verboseLog = keep.verboseLog;
-                s.mergeYps = keep.mergeYps;
-                s.mergeBos = keep.mergeBos;
-                s.mergeGeneric = keep.mergeGeneric;
-                s.mergeWindow = keep.mergeWindow;
-                s.ypsLimit = keep.ypsLimit;
-                NT::SaveSettings();
+                NT::ResetDisplaySettings();
             } else {
                 g_confirmUntil = now + kConfirmSeconds;
             }
@@ -194,7 +183,7 @@ namespace
 
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
-        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, 8.0F, 72.0F, "%.0f px", kClamp);
+        ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max, "%.0f px", kClamp);
         Commit();
         Tooltip(t.fontSizeTip);
         ImGuiMCP::ColorEdit4((t.textColor + "##color").c_str(), s.textColor);
@@ -209,27 +198,27 @@ namespace
         Commit(ImGuiMCP::Checkbox((t.immediate + "##immediate").c_str(), &s.immediate));
         Tooltip(t.immediateTip);
         if (!s.immediate) {
-            SecondsSlider(t.queueDelay, "##queuedelay", s.queueDelay, 0.1F, 5.0F);
+            SecondsSlider(t.queueDelay, "##queuedelay", s.queueDelay, NT::Limits::kQueueDelay);
         }
-        SecondsSlider(t.duration, "##duration", s.duration, 0.5F, 30.0F);
+        SecondsSlider(t.duration, "##duration", s.duration, NT::Limits::kDuration);
         Commit(ImGuiMCP::Checkbox((t.stack + "##stack").c_str(), &s.stackDuplicates));
 
         // Values most players set once or never.
         ImGuiMCP::Spacing();
         if (ImGuiMCP::CollapsingHeader((t.headAdvanced + "##advanced").c_str())) {
-            PercentSlider(t.posX, "##posx", s.posX, 0.0F, 1.0F);
-            PercentSlider(t.posY, "##posy", s.posY, 0.0F, 1.0F);
+            PercentSlider(t.posX, "##posx", s.posX, NT::Limits::kPos);
+            PercentSlider(t.posY, "##posy", s.posY, NT::Limits::kPos);
             Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
             Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
             Tooltip(t.showInMenusTip);
-            PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, 0.1F, 1.0F);
-            ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, 1, 20, "%d", kClamp);
+            PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, NT::Limits::kMaxWidth);
+            ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, NT::Limits::kMaxVisible.min, NT::Limits::kMaxVisible.max, "%d", kClamp);
             Commit();
-            ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, 0.0F, 30.0F, "%.0f px", kClamp);
+            ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, NT::Limits::kLineSpacing.min, NT::Limits::kLineSpacing.max, "%.0f px", kClamp);
             Commit();
-            PercentSlider(t.background, "##background", s.backgroundAlpha, 0.0F, 1.0F);
-            SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, 0.0F, 3.0F);
-            SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, 0.0F, 5.0F);
+            PercentSlider(t.background, "##background", s.backgroundAlpha, NT::Limits::kBackground);
+            SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, NT::Limits::kFadeIn);
+            SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, NT::Limits::kFadeOut);
             RenderResetDisplay();
         }
 
@@ -273,7 +262,7 @@ namespace
         Tooltip(t.mergeBosTip);
         Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
         Tooltip(t.mergeGenericTip);
-        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, 0.05F, 2.0F);
+        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
 
         ImGuiMCP::SeparatorText(t.headTest.c_str());
         if (ImGuiMCP::Button((t.testYps + "##testyps").c_str())) {
@@ -286,15 +275,6 @@ namespace
 
         ImGuiMCP::Spacing();
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
-    }
-
-    std::wstring Lowercase(std::string_view a_utf8)
-    {
-        auto wide = NT::Text::ToWide(a_utf8);
-        if (!wide.empty()) {
-            CharLowerBuffW(wide.data(), static_cast<DWORD>(wide.size()));
-        }
-        return wide;
     }
 
     std::string LocalTime(std::chrono::system_clock::time_point a_time)
@@ -358,17 +338,17 @@ namespace
         }
         ImGuiMCP::Separator();
 
-        const auto needle = Lowercase(filter);
+        const auto needle = NT::Text::Lower(filter);
         if (ImGuiMCP::BeginChild("##historylist", { 0.0F, 0.0F })) {
             bool                                  any = false;
             std::deque<NT::Capture::HistoryEntry> history;
             NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) { history = a_history; });
             for (auto it = history.rbegin(); it != history.rend(); ++it) {
-                if (!needle.empty() && Lowercase(it->text).find(needle) == std::wstring::npos) {
+                if (!needle.empty() && NT::Text::Lower(it->text).find(needle) == std::string::npos) {
                     continue;
                 }
                 any = true;
-                const auto key = NT::Capture::HideKey(it->text);
+                const auto key = NT::Text::HideKey(it->text);
                 const bool isHidden = hidden.contains(key);
                 HideToggle(key, isHidden, it->id);
                 ImGuiMCP::SameLine();
@@ -382,10 +362,7 @@ namespace
                     continue;
                 }
                 if (it->rgb) {
-                    const auto rgb = *it->rgb;
-                    ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text,
-                        { static_cast<float>((rgb >> 16) & 0xFF) / 255.0F, static_cast<float>((rgb >> 8) & 0xFF) / 255.0F,
-                            static_cast<float>(rgb & 0xFF) / 255.0F, 1.0F });
+                    ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, NT::Overlay::RgbColor(*it->rgb));
                 }
                 ImGuiMCP::TextWrapped("%s", line.c_str());
                 if (it->rgb) {

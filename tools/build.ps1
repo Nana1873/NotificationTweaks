@@ -1,4 +1,5 @@
-# Configures and builds NotificationTweaks.dll from a VS x64 developer environment.
+# Configures and builds NotificationTweaks.dll from a VS x64 developer environment,
+# then runs the unit tests (tests\Tests.cpp); a failing check fails the build.
 # Usage: .\tools\build.ps1 [-Preset release] [-ConfigureOnly]
 # Full compiler output goes to build\build-log.txt.
 [CmdletBinding()]
@@ -27,7 +28,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $root 'build') | Out-Null
 $log = Join-Path $root 'build\build-log.txt'
 
 $steps = "cmake --preset $Preset"
-if (-not $ConfigureOnly) { $steps += " && cmake --build --preset $Preset" }
+if (-not $ConfigureOnly) { $steps += " && cmake --build --preset $Preset && build\$Preset\NotificationTweaksTests.exe" }
 $cmd = "call `"$vcvars`" >nul && cd /d `"$root`" && ($steps) > `"$log`" 2>&1"
 cmd.exe /d /c $cmd
 $exit = $LASTEXITCODE

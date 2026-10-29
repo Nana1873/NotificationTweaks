@@ -11,8 +11,18 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $version = (Get-Content (Join-Path $root 'vcpkg.json') -Raw | ConvertFrom-Json).'version-semver'
 if (-not $version) { throw "No version-semver in vcpkg.json" }
 
+$cmakeVersion = [regex]::Match((Get-Content (Join-Path $root 'CMakeLists.txt') -Raw), 'project\(\S+ VERSION (\S+)').Groups[1].Value
+if ($cmakeVersion -ne $version) { throw "Version mismatch: vcpkg.json $version, CMakeLists.txt $cmakeVersion" }
+
+& python -I (Join-Path $root 'tools\strings.py') --check
+if ($LASTEXITCODE -ne 0) { throw 'Generated string files are out of date (run python -I tools\strings.py)' }
+
 $dll = Join-Path $root "build\$Preset\NotificationTweaks.dll"
 if (-not (Test-Path $dll)) { throw "DLL not built: $dll (run tools\build.ps1 first)" }
+$newestSource = Get-ChildItem (Join-Path $root 'src') -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($newestSource.LastWriteTime -gt (Get-Item $dll).LastWriteTime) {
+    throw "DLL is older than src\$($newestSource.Name) (run tools\build.ps1 first)"
+}
 
 $translations = Join-Path $root 'config\Interface\Translations'
 if (-not (Test-Path (Join-Path $translations 'NotificationTweaks_ENGLISH.txt'))) {
