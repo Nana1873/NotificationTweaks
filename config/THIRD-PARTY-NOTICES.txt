@@ -31,4 +31,11 @@ rapidcsv (header used by CommonLibSSE-NG)
   https://github.com/d99kris/rapidcsv
   BSD 3-Clause License, Copyright (c) 2017, Kristofer Berggren
 
+zlib (reads compressed Scaleform font libraries for icon fonts)
+  https://zlib.net
+  zlib License, Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+
+No files from Oblivion Interaction Icons or other mods are included; icon
+fonts are read at runtime from the player's own installation.
+
 The full license texts are available at the project pages above.
