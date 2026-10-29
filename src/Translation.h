@@ -62,6 +62,8 @@ namespace NT::Translation
         std::string fadeOut = "Fade out";
         std::string stack = "Stack identical messages (x2)";
         std::string headTest = "Test";
+        std::string headMerge = "Split messages";
+        std::string headIconFonts = "Icon fonts";
         std::string test1 = "Send test message";
         std::string testMany = "Send 4 at once";
         std::string resetDisplay = "Reset display settings";

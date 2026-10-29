@@ -199,6 +199,8 @@ namespace NT::Translation
         g_strings.fadeOut = Translate("$NT_FadeOut", defaults.fadeOut);
         g_strings.stack = Translate("$NT_Stack", defaults.stack);
         g_strings.headTest = Translate("$NT_HeadTest", defaults.headTest);
+        g_strings.headMerge = Translate("$NT_HeadMerge", defaults.headMerge);
+        g_strings.headIconFonts = Translate("$NT_HeadIconFonts", defaults.headIconFonts);
         g_strings.test1 = Translate("$NT_Test1", defaults.test1);
         g_strings.testMany = Translate("$NT_TestMany", defaults.testMany);
         g_strings.resetDisplay = Translate("$NT_ResetDisplay", defaults.resetDisplay);

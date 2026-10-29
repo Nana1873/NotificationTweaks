@@ -58,6 +58,8 @@ STRINGS = [
     ("fadeOut", "Fade out", "Ausblenden"),
     ("stack", "Stack identical messages (x2)", "Gleiche Meldungen zusammenfassen (x2)"),
     ("headTest", "Test", "Test"),
+    ("headMerge", "Split messages", "Geteilte Meldungen"),
+    ("headIconFonts", "Icon fonts", "Icon-Fonts"),
     ("test1", "Send test message", "Testmeldung senden"),
     ("testMany", "Send 4 at once", "4 gleichzeitig senden"),
     ("resetDisplay", "Reset display settings", "Anzeige zurücksetzen"),

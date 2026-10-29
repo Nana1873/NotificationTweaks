@@ -58,6 +58,14 @@ namespace
     {
         a_entry.text = NT::Markup::Visible(a_raw);
         a_entry.rgb = NT::Markup::WrappingColor(a_raw);
+        a_entry.icons.clear();
+        for (const auto& run : NT::Markup::Parse(a_raw)) {
+            for (std::size_t i = 0; !run.iconFace.empty() && i < run.text.size();) {
+                if (const auto code = NT::Text::NextCodePoint(run.text, i); code != U' ' && code != U'\t') {
+                    a_entry.icons.emplace_back(run.iconFace, code);
+                }
+            }
+        }
     }
 
     // Caller holds g_lock.

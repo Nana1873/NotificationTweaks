@@ -255,6 +255,7 @@ namespace
         const auto& t = NT::Translation::S();
         auto&       s = NT::Config();
 
+        ImGuiMCP::SeparatorText(t.headMerge.c_str());
         ImGuiMCP::TextWrapped("%s", t.compatHint.c_str());
         ImGuiMCP::Spacing();
         Commit(ImGuiMCP::Checkbox((t.mergeYps + "##yps").c_str(), &s.mergeYps));
@@ -263,6 +264,9 @@ namespace
         Tooltip(t.mergeBosTip);
         Commit(ImGuiMCP::Checkbox((t.mergeGeneric + "##generic").c_str(), &s.mergeGeneric));
         Tooltip(t.mergeGenericTip);
+        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
+
+        ImGuiMCP::SeparatorText(t.headIconFonts.c_str());
         if (const bool changed = ImGuiMCP::Checkbox((t.drawIconFonts + "##iconfonts").c_str(), &s.drawIconFonts); changed) {
             // Load before publishing the setting, so the game thread never
             // finds the option on with the fonts still unread.
@@ -279,11 +283,11 @@ namespace
             } else {
                 ImGuiMCP::TextDisabled("    %s", t.iconFontsFound.c_str());
                 for (const auto& [face, glyphs] : found) {
-                    ImGuiMCP::TextDisabled("      %s (%zu %s)", face.c_str(), glyphs, t.iconFontGlyphs.c_str());
+                    const std::string_view name = face.starts_with('$') ? std::string_view(face).substr(1) : std::string_view(face);
+                    ImGuiMCP::TextDisabled("      %.*s (%zu %s)", static_cast<int>(name.size()), name.data(), glyphs, t.iconFontGlyphs.c_str());
                 }
             }
         }
-        SecondsSlider(t.mergeWindow, "##mergewindow", s.mergeWindow, NT::Limits::kMergeWindow);
 
         ImGuiMCP::SeparatorText(t.headTest.c_str());
         if (ImGuiMCP::Button((t.testYps + "##testyps").c_str())) {
@@ -324,6 +328,25 @@ namespace
         if (clicked) {
             NT::Capture::SetHidden(a_key, !a_hidden);
         }
+    }
+
+    // Icon-font glyphs of a history line, one text line high, each followed
+    // by SameLine. Returns how many were drawn.
+    int HistoryIcons(const NT::Capture::HistoryEntry& a_entry, const ImGuiMCP::ImVec4& a_tint)
+    {
+        if (!NT::Config().drawIconFonts) {
+            return 0;
+        }
+        const float height = ImGuiMCP::GetTextLineHeight();
+        int         drawn = 0;
+        for (const auto& [face, code] : a_entry.icons) {
+            if (const auto icon = NT::IconFont::Get(face, code, height)) {
+                ImGuiMCP::Image(icon->texture, { icon->aspect * height, height }, icon->uv0, icon->uv1, a_tint);
+                ImGuiMCP::SameLine();
+                ++drawn;
+            }
+        }
+        return drawn;
     }
 
     // Page "History": the session's notifications, newest first, in their
@@ -369,30 +392,36 @@ namespace
                     continue;
                 }
                 any = true;
-                if (it->text.empty()) {  // only icons: nothing to read or hide by
-                    ImGuiMCP::TextDisabled("%s  %s", LocalTime(it->time).c_str(), t.historyIconOnly.c_str());
-                    continue;
+                // Icon-only lines have no text to hide by: a blank of the
+                // eye's size keeps the columns aligned.
+                const bool iconsOnly = it->text.empty();
+                const auto key = iconsOnly ? std::string{} : NT::Text::HideKey(it->text);
+                const bool isHidden = !iconsOnly && hidden.contains(key);
+                if (iconsOnly) {
+                    ImGuiMCP::Dummy({ ImGuiMCP::GetFrameHeight(), ImGuiMCP::GetFrameHeight() });
+                } else {
+                    HideToggle(key, isHidden, it->id);
                 }
-                const auto key = NT::Text::HideKey(it->text);
-                const bool isHidden = hidden.contains(key);
-                HideToggle(key, isHidden, it->id);
                 ImGuiMCP::SameLine();
                 ImGuiMCP::TextDisabled("%s", LocalTime(it->time).c_str());
                 ImGuiMCP::SameLine();
-                const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
-                if (isHidden) {
-                    ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled));
-                    ImGuiMCP::TextWrapped("%s", line.c_str());
-                    ImGuiMCP::PopStyleColor();
+
+                const auto color = isHidden ? *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled) :
+                                   it->rgb  ? NT::Overlay::RgbColor(*it->rgb) :
+                                              *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_Text);
+                const int  icons = HistoryIcons(*it, color);
+                if (iconsOnly) {
+                    if (icons == 0) {
+                        ImGuiMCP::TextDisabled("%s", t.historyIconOnly.c_str());  // font missing or off
+                    } else {
+                        ImGuiMCP::NewLine();  // end the SameLine after the last icon
+                    }
                     continue;
                 }
-                if (it->rgb) {
-                    ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, NT::Overlay::RgbColor(*it->rgb));
-                }
+                const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
+                ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, color);
                 ImGuiMCP::TextWrapped("%s", line.c_str());
-                if (it->rgb) {
-                    ImGuiMCP::PopStyleColor();
-                }
+                ImGuiMCP::PopStyleColor();
             }
             if (!any) {
                 ImGuiMCP::TextDisabled("%s", t.historyEmpty.c_str());

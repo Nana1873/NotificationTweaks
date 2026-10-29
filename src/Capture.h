@@ -30,6 +30,7 @@ namespace NT::Capture
         std::string                           text;   // visible UTF-8, tags removed
         std::optional<std::uint32_t>          rgb;    // wrapping <font color>, if any
         int                                   count = 1;
+        std::vector<std::pair<std::string, char32_t>> icons;  // icon-font glyphs (face, code), shown before the text
     };
 
     // Keep in step with historyHint in tools/strings.py ("The last 100 ...").
