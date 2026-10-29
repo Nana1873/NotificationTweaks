@@ -71,6 +71,13 @@ namespace
         CHECK(ToUtf8("\xE4") == "\xC3\xA4");             // Windows-1252 fallback
         CHECK(ToUtf8("\xC3\xA4") == "\xC3\xA4");         // valid UTF-8 stays
 
+        // Icon fonts (Oblivion Interaction Icons, vanilla symbols): glyph dropped, text kept.
+        CHECK(Visible("<font face=\"$Iconographia\">W</font> Saving...") == "Saving...");
+        CHECK(Visible("<font face='$SkyrimSymbolsFont' color='#FFFFFF'>A</font>Text") == "Text");
+        CHECK(Visible("<font face=\"$Iconographia\"><font color=\"#FF0000\">W</font></font> x") == "x");
+        CHECK(Visible("<font face=\"$EverywhereFont\">Normal</font>") == "Normal");
+        CHECK(Visible("<font face=\"$Iconographia\">W</font> Saving") == Visible("Saving"));
+
         const auto runs = Parse("a <font color=\"#112233\">b</font> c");
         CHECK(runs.size() == 3);
         CHECK(runs.size() == 3 && runs[1].rgb == 0x112233u && !runs[0].rgb && !runs[2].rgb);

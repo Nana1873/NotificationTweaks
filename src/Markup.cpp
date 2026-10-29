@@ -51,6 +51,16 @@ namespace
         return std::nullopt;
     }
 
+    // Icon fonts map pictures onto letters ("$Iconographia" from Oblivion
+    // Interaction Icons draws its save icon as "W", the game's own
+    // "$SkyrimSymbolsFont" works the same way). The overlay cannot draw
+    // those fonts, so their text is dropped instead of showing the letter.
+    bool IsIconFace(std::string_view a_face)
+    {
+        const auto lower = Lower(a_face);
+        return lower.find("icon") != std::string::npos || lower.find("symbol") != std::string::npos;
+    }
+
     std::optional<std::uint32_t> ParseColor(std::string_view a_value)
     {
         if (!a_value.empty() && a_value.front() == '#') {
@@ -115,6 +125,7 @@ namespace NT::Markup
         std::vector<Run>                           runs;
         std::vector<std::optional<std::uint32_t>> colors{ std::nullopt };
         std::vector<bool>                          fontPushedColor;  // per open <font>: did it push a color?
+        std::vector<bool>                          iconFont{ false };  // per open <font>: inside an icon font?
         Run                                        current;
 
         const auto flush = [&]() {
@@ -141,11 +152,13 @@ namespace NT::Markup
                 if (lower.starts_with("font")) {
                     const auto color = Attribute(tag, "color");
                     const auto rgb = color ? ParseColor(*color) : std::nullopt;
+                    const auto face = Attribute(tag, "face");
                     flush();
                     fontPushedColor.push_back(rgb.has_value());
                     if (rgb) {
                         colors.push_back(rgb);
                     }
+                    iconFont.push_back(face ? IsIconFace(*face) : iconFont.back());
                     current.rgb = colors.back();
                 } else if (lower.starts_with("/font")) {
                     flush();
@@ -155,12 +168,17 @@ namespace NT::Markup
                         }
                         fontPushedColor.pop_back();
                     }
+                    if (iconFont.size() > 1) {
+                        iconFont.pop_back();
+                    }
                     current.rgb = colors.back();
                 } else if (lower.starts_with("br") || lower.starts_with("/p")) {
                     flush();
                     current.lineBreak = true;
                 }
                 i = end;
+            } else if (iconFont.back()) {
+                continue;  // a glyph of an icon font: its letter would show instead of the icon
             } else if (c == '&') {
                 const auto end = text.find(';', i);
                 if (end != std::string::npos && end - i <= 10) {
@@ -191,7 +209,8 @@ namespace NT::Markup
             }
             out += run.text;
         }
-        return out;
+        // A dropped icon leaves the space that followed it.
+        return std::string(NT::Text::Trim(out));
     }
 
     std::optional<std::uint32_t> WrappingColor(std::string_view a_raw)

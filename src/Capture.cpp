@@ -215,6 +215,9 @@ namespace NT::Capture
     {
         const auto             translated = TranslateKey(a_raw);
         const std::string_view raw = translated.empty() ? a_raw : std::string_view{ translated };
+        if (Markup::Visible(raw).empty()) {
+            return;  // nothing drawable, e.g. only an icon-font glyph
+        }
 
         const auto s = CaptureConfig();
         const auto  now = std::chrono::steady_clock::now();

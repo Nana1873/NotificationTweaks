@@ -2,7 +2,9 @@
 
 // The small HTML subset the Vanilla notification text field renders
 // (Scaleform htmlText): <font color="#RRGGBB">, <br>, entities. Everything
-// else is dropped as a tag.
+// else is dropped as a tag. Text inside <font face="..."> of an icon font
+// (name contains "icon" or "symbol") is dropped too: the overlay would
+// draw the letter the icon is mapped to.
 namespace NT::Markup
 {
     struct Run
@@ -19,7 +21,8 @@ namespace NT::Markup
 
     std::vector<Run> Parse(std::string_view a_raw);
 
-    // Tag-free text (entities decoded): merge heuristics, history and hide keys.
+    // Tag-free text (entities decoded, icon glyphs dropped, trimmed): merge
+    // heuristics, history and hide keys.
     std::string Visible(std::string_view a_raw);
 
     // The color of the outermost <font color> when it wraps the whole text.
