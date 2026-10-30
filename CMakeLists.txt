@@ -23,6 +23,7 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/Translation.cpp
         src/SwfFont.cpp
         src/IconFont.cpp
+        src/CenterNotifications.cpp
 )
 
 find_package(ZLIB REQUIRED)

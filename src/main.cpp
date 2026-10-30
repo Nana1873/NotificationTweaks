@@ -1,4 +1,5 @@
 #include "Capture.h"
+#include "CenterNotifications.h"
 #include "IconFont.h"
 #include "Merge.h"
 #include "MenuIntegration.h"
@@ -58,6 +59,7 @@ namespace
         NT::Translation::LoadStrings();
         NT::Capture::LoadHidden();
         NT::Capture::LoadDurations();
+        NT::CenterNotifications::LoadSettings();
         if (NT::Config().drawIconFonts) {
             NT::IconFont::Preload();  // during the loading screen, not mid-game
         }

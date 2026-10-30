@@ -1,5 +1,6 @@
 #include "Capture.h"
 
+#include "CenterNotifications.h"
 #include "IconFont.h"
 #include "Settings.h"
 #include "Text.h"
@@ -259,6 +260,9 @@ namespace
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
                     data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
                     const char* text = data->text.c_str();
+                    if (text && NT::CenterNotifications::HandleDebugMessage(text)) {
+                        return RE::UI_MESSAGE_RESULTS::kHandled;
+                    }
                     if (!NT::CaptureEnabled()) {
                         if (text && *text) {
                             RecordOnly(text);
@@ -309,7 +313,13 @@ namespace
                     }
                 }
             }
+            if (a_this) {
+                NT::CenterNotifications::BeforeUpdate(a_this);
+            }
             func(a_this);
+            if (a_this) {
+                NT::CenterNotifications::AfterUpdate(a_this);
+            }
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
