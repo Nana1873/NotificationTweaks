@@ -59,6 +59,7 @@ namespace
         info.SetScale(g_base->GetXScale() * p.scale, g_base->GetYScale() * p.scale);
         a_root.SetDisplayInfo(info);
         g_applied = a_group;
+        logs::debug("Center notifications: {} at {:+.0f}, {:+.0f}, x{:.2f}", a_group ? static_cast<int>(*a_group) : -1, p.x, p.y, p.scale);
     }
 
     // Clip origin (Vanilla spot) and one HUD unit in screen pixels, through
