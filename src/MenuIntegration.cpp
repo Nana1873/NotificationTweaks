@@ -350,6 +350,7 @@ namespace
 
     constexpr float kDefaultTimeAlpha = 0.45F;  // dimmed, still readable
     constexpr float kTimeSliderEms = 5.0F;      // fits "30.0 s" and "Standard"
+    constexpr float kTimeStep = 0.1F;           // as shown ("%.1f s") and saved ("{:.1f}")
 
     float DurationSliderWidth()
     {
@@ -376,9 +377,9 @@ namespace
         ImGuiMCP::SetNextItemWidth(DurationSliderWidth());
         if (ImGuiMCP::SliderFloat(std::format("###time{}", a_id).c_str(), &value, NT::Limits::kDuration.min, NT::Limits::kDuration.max,
                 a_own ? "%.1f s" : a_defaultLabel.c_str(), kClamp)) {
-            // Whole tenths, as saved: a click on "Default" (no format to round
+            // Whole steps, as saved: a click on "Default" (no format to round
             // by) would otherwise keep e.g. 4.2378 s for this session.
-            NT::Capture::SetDuration(a_key, std::round(value * 10.0F) / 10.0F);
+            NT::Capture::SetDuration(a_key, std::round(value / kTimeStep) * kTimeStep);
         }
         ImGuiMCP::PopStyleVar(2);
         if (ImGuiMCP::IsItemDeactivatedAfterEdit()) {
@@ -516,14 +517,15 @@ namespace
         ImGuiMCP::EndChild();
     }
 
-    // Leaving the menu ends positioning even when the window was not closed
-    // through Done.
+    // Leaving the menu writes pending display times and ends positioning
+    // even when the window was not closed through Done.
     void __stdcall OnMenuEvent(SKSEMenuFramework::Model::EventType a_type)
     {
-        if (a_type == SKSEMenuFramework::Model::kCloseMenu) {
-            NT::Capture::SaveDurationsIfChanged();
+        if (a_type != SKSEMenuFramework::Model::kCloseMenu) {
+            return;
         }
-        if (a_type == SKSEMenuFramework::Model::kCloseMenu && NT::Overlay::IsPositioning() && g_positionWindow && !g_positionWindow->IsOpen) {
+        NT::Capture::SaveDurationsIfChanged();
+        if (NT::Overlay::IsPositioning() && g_positionWindow && !g_positionWindow->IsOpen) {
             NT::Overlay::SetPositioning(false);
             NT::SaveSettings();
         }

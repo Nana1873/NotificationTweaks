@@ -67,14 +67,14 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   ShowHUDMessage (SE 52050 / AE 52933) also drops a line sent with
   `cancelIfAlreadyQueued` (Debug.Notification, most plugins) whose text
   hash is among the last eight of the past 5 s; Auto Nearby Quest Tracker
-  lost its newest state that way. On the versions whose Address Library
-  was checked the plugin clears that table (8 x {u32 hash, u32 ms},
-  checked at startup against the static-init guard right behind it) after
-  each line it takes, unless stacking is off: SE 1.5.97 (table 520091,
-  guard 520093, read from the running code in the SE test instance, since
-  the SE exe is encrypted on disk) and AE 1.6.317 to 1.6.1179, 1.7.99,
-  1.7.104 (406616, 406624). Other SE versions, VR and newer runtimes keep
-  the filter.
+  lost its newest state that way. The plugin clears that table (8 x {u32
+  hash, u32 ms}, checked at startup against the static-init guard right
+  behind it) after each line it takes, unless stacking is off. Cleared on:
+  SE 1.5.97 (table 520091, guard 520093; read from the running code in the
+  SE test instance, the SE exe is encrypted on disk); the AE versions listed
+  in `kRepeatFilterVersionsAE` (1.6.317 to 1.6.1179, 1.7.99, 1.7.104;
+  406616, 406624). Other SE versions, VR and
+  newer runtimes keep the filter.
   Trade-offs: interleaved repeats (A, B, A, B) now each get a line, and a
   script sending A, B, A within one frame still loses the second A (the
   table is cleared on the main thread after the sender recorded it; a hook
@@ -198,7 +198,7 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 - Unit tests (`tests/Tests.cpp`, built and run by `tools/build.ps1` and
   again by `package.ps1`) cover the pure code: YPS/BoS/generic merge
   rules, markup parsing, entities and icon runs, the 1252 fallback, hide
-  keys, the `[Hidden]` escaping, UTF-8 code points, fontconfig parsing,
+  keys, the `[Hidden]` and ImGui format escaping, UTF-8 code points, fontconfig parsing,
   the even-odd rasterizer and the atlas level choice. They link
   `Merge.cpp`, `Markup.cpp` and `SwfFont.cpp` (with zlib) against
   `tests/TestPCH.h` (no CommonLibSSE, `logs::` is a no-op). Setting
@@ -211,7 +211,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   Tracker toggles all arrive, Papyrus A, B, A, A shows "A / B / A (x2)",
   the startup log has no "Engine repeat filter left alone" line there,
   and the slider (dimmed default, own time, right-click reset, saved on
-  release) works by hand.
+  release, kept across a restart) works by hand. In the test instances
+  (`instances/` at the lab root) SE 1.5.97 and AE 1.6.1170 log "Engine
+  repeat filter cleared after each taken line" and Papyrus A, B, A (1 s
+  apart) arrives as three lines; ANQT itself and the menu were not run
+  there.
 - `tools/deploy.ps1 [-Register]`, then
   `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Most tests need
   no save: `coc riverwood` (DevBench console) from the main menu avoids

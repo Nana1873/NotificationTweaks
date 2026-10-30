@@ -176,9 +176,8 @@ namespace
     }
 
     // The engine's repeat filter in ShowHUDMessage (SE 52050 / AE 52933),
-    // see design-notes, Merge rules, "Repeats". We stack repeats ourselves, so it is
-    // cleared after each line we take. Only on the versions whose layout was
-    // checked (Install).
+    // see design-notes, Merge rules, "Repeats". We stack repeats ourselves,
+    // so it is cleared after each line we take.
     struct RecentMessage
     {
         std::uint32_t hash;
@@ -192,25 +191,32 @@ namespace
         std::uint64_t table;
         std::uint64_t guard;
     };
-    constexpr RepeatFilterIds kRepeatFilterSE{ 520091, 520093 };  // read from the running 1.5.97 code
+    // SE: read from the running 1.5.97 code (the exe is encrypted on disk),
+    // see design-notes. AE: from the disassembly of 1.7.104.
+    constexpr RepeatFilterIds kRepeatFilterSE{ 520091, 520093 };
     constexpr RepeatFilterIds kRepeatFilterAE{ 406616, 406624 };
     // The versions whose Address Library was checked to have both IDs, 64
     // bytes apart. A missing ID would stop the game at startup (NG's lookup
     // does not fail softly), so any other version is left alone.
     constexpr REL::Version kRepeatFilterVersionsSE[] = { { 1, 5, 97, 0 } };
-    constexpr REL::Version kRepeatFilterVersionsAE[] = { { 1, 6, 317, 0 }, { 1, 6, 318, 0 }, { 1, 6, 323, 0 }, { 1, 6, 342, 0 },
-        { 1, 6, 353, 0 }, { 1, 6, 629, 0 }, { 1, 6, 640, 0 }, { 1, 6, 659, 0 }, { 1, 6, 1130, 0 }, { 1, 6, 1170, 0 },
-        { 1, 6, 1179, 0 }, { 1, 7, 99, 0 }, { 1, 7, 104, 0 } };
+    constexpr REL::Version kRepeatFilterVersionsAE[] = {
+        { 1, 6, 317, 0 }, { 1, 6, 318, 0 }, { 1, 6, 323, 0 }, { 1, 6, 342, 0 }, { 1, 6, 353, 0 },
+        { 1, 6, 629, 0 }, { 1, 6, 640, 0 }, { 1, 6, 659, 0 },
+        { 1, 6, 1130, 0 }, { 1, 6, 1170, 0 }, { 1, 6, 1179, 0 },
+        { 1, 7, 99, 0 }, { 1, 7, 104, 0 },
+    };
 
     RecentMessage* g_recentMessages = nullptr;  // set by Install when the layout matches
 
     void FindEngineRepeatFilter()
     {
         const auto version = REL::Module::get().version();
-        const auto checked = [&](std::span<const REL::Version> a_versions) { return std::ranges::find(a_versions, version) != a_versions.end(); };
-        const auto ids = REL::Module::IsAE() && checked(kRepeatFilterVersionsAE) ? std::optional{ kRepeatFilterAE } :
-                         REL::Module::IsSE() && checked(kRepeatFilterVersionsSE) ? std::optional{ kRepeatFilterSE } :
-                                                                                   std::nullopt;
+        std::optional<RepeatFilterIds> ids;
+        if (REL::Module::IsAE() && std::ranges::contains(kRepeatFilterVersionsAE, version)) {
+            ids = kRepeatFilterAE;
+        } else if (REL::Module::IsSE() && std::ranges::contains(kRepeatFilterVersionsSE, version)) {
+            ids = kRepeatFilterSE;
+        }
         if (!ids) {
             logs::info("Engine repeat filter left alone on {}", version.string());
             return;

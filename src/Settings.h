@@ -103,7 +103,7 @@ namespace NT
         bool  mergeBos = true;
         bool  mergeGeneric = false;
         float mergeWindow = 0.35F;
-        float duration = 4.0F;  // general display time; a line's own time replaces it (stacking window)
+        float duration = 4.0F;  // general display time; with fadeIn it bounds the stacking window unless a line has its own time
         float fadeIn = 0.15F;
         int   ypsLimit = 80;
         bool  drawIconFonts = true;

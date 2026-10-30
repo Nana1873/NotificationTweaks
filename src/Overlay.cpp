@@ -231,7 +231,9 @@ namespace
                 }
             }
 
-            std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) { return a_entry.started && a_entry.age >= Lifetime(a_entry, a_settings); });
+            std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) {
+                return a_entry.started && a_entry.age >= Lifetime(a_entry, a_settings);
+            });
             for (const auto& entry : a_entries) {
                 if (entry.started && !entry.hidden) {
                     visible.push_back(entry);

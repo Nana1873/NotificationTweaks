@@ -92,17 +92,20 @@ namespace
         WritePrivateProfileSectionA(a_section, section.c_str(), path.c_str());
     }
 
+    // The whole text as a finite float, or nothing.
+    std::optional<float> ParseFloat(std::string_view a_text)
+    {
+        float      value = 0.0F;
+        const auto [ptr, ec] = std::from_chars(a_text.data(), a_text.data() + a_text.size(), value);
+        if (a_text.empty() || ec != std::errc{} || ptr != a_text.data() + a_text.size() || !std::isfinite(value)) {
+            return std::nullopt;
+        }
+        return value;
+    }
+
     float ReadFloat(const char* a_section, const char* a_key, float a_default, NT::Range<float> a_range, const std::string& a_path)
     {
-        const auto text = ReadString(a_section, a_key, "", a_path);
-        float      value = a_default;
-        if (!text.empty()) {
-            const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (ec != std::errc{} || ptr != text.data() + text.size() || !std::isfinite(value)) {
-                value = a_default;
-            }
-        }
-        return std::clamp(value, a_range.min, a_range.max);
+        return std::clamp(ParseFloat(ReadString(a_section, a_key, "", a_path)).value_or(a_default), a_range.min, a_range.max);
     }
 
     int ReadInt(const char* a_section, const char* a_key, int a_default, NT::Range<int> a_range, const std::string& a_path)
@@ -298,11 +301,8 @@ namespace NT
         std::map<std::string, float> durations;
         ReadKeySection("Durations", path, [&](int a_index, std::string a_key) {
             // A line without a valid time is dropped, not given a default one.
-            const auto text = ReadString("Durations", std::format("Time{}", a_index).c_str(), "", path);
-            float      seconds = 0.0F;
-            if (const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), seconds);
-                !text.empty() && ec == std::errc{} && ptr == text.data() + text.size() && std::isfinite(seconds)) {
-                durations[std::move(a_key)] = std::clamp(seconds, Limits::kDuration.min, Limits::kDuration.max);
+            if (const auto seconds = ParseFloat(ReadString("Durations", std::format("Time{}", a_index).c_str(), "", path))) {
+                durations[std::move(a_key)] = std::clamp(*seconds, Limits::kDuration.min, Limits::kDuration.max);
             }
         });
         logs::info("{} own display time(s) loaded", durations.size());
