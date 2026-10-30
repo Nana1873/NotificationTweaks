@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(NotificationTweaks VERSION 1.3.0 LANGUAGES CXX)
+project(NotificationTweaks VERSION 1.3.0 LANGUAGES CXX RC)
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -25,6 +25,10 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/IconFont.cpp
         src/CenterNotifications.cpp
 )
+
+# Windows version info (file properties), from the project version.
+configure_file(cmake/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/version.rc @ONLY)
+target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 
 find_package(ZLIB REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE ZLIB::ZLIB)
