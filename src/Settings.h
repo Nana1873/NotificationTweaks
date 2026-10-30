@@ -50,7 +50,7 @@ namespace NT
     }
 
     // The big notifications in the middle of the screen, in the groups that
-    // can each get their own place. Order = INI key prefixes in Settings.cpp.
+    // can each get their own place.
     enum class CenterGroup : int
     {
         kLocation,
@@ -60,6 +60,9 @@ namespace NT
         kCount
     };
     inline constexpr std::size_t kCenterGroups = static_cast<std::size_t>(CenterGroup::kCount);
+
+    // Per CenterGroup: INI key prefix in [CenterNotifications], also used in logs.
+    inline constexpr std::array<const char*, kCenterGroups> kCenterKeys = { "Location", "Quest", "Skill", "Shout" };
 
     // Where a group shows, relative to the Vanilla spot and size.
     struct CenterPlacement
@@ -137,6 +140,7 @@ namespace NT
         float fadeIn = 0.15F;
         int   ypsLimit = 80;
         bool  drawIconFonts = true;
+        bool  verboseLog = false;
         std::array<CenterPlacement, kCenterGroups> center{};
     };
 
@@ -145,7 +149,7 @@ namespace NT
     void      LoadSettings();
     void      SaveSettings();
 
-    // Menu reset: display, layout and timing back to defaults; the switch,
+    // Menu reset: display style and timing back to defaults; the switch,
     // logging and the compatibility rules stay. Saves.
     void ResetDisplaySettings();
 

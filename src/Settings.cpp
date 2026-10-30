@@ -28,14 +28,12 @@ namespace
         c.fadeIn = s.fadeIn;
         c.ypsLimit = s.ypsLimit;
         c.drawIconFonts = s.drawIconFonts;
+        c.verboseLog = s.verboseLog;
         c.center = s.center;
         std::scoped_lock lock{ g_captureLock };
         g_capture = c;
         g_captureEnabled = c.enabled;
     }
-
-    // INI key prefix per CenterGroup.
-    constexpr const char* kCenterKeys[NT::kCenterGroups] = { "Location", "Quest", "Skill", "Shout" };
 
     std::string IniPath()
     {
@@ -205,9 +203,9 @@ namespace NT
         for (std::size_t i = 0; i < kCenterGroups; ++i) {
             const std::string key = kCenterKeys[i];
             auto&             c = s.center[i];
-            c.x = ReadFloat("CenterNotifications", (key + "X").c_str(), 0.0F, Limits::kCenterX, path);
-            c.y = ReadFloat("CenterNotifications", (key + "Y").c_str(), 0.0F, Limits::kCenterY, path);
-            c.scale = ReadFloat("CenterNotifications", (key + "Scale").c_str(), 1.0F, Limits::kCenterScale, path);
+            c.x = ReadFloat("CenterNotifications", (key + "X").c_str(), d.center[i].x, Limits::kCenterX, path);
+            c.y = ReadFloat("CenterNotifications", (key + "Y").c_str(), d.center[i].y, Limits::kCenterY, path);
+            c.scale = ReadFloat("CenterNotifications", (key + "Scale").c_str(), d.center[i].scale, Limits::kCenterScale, path);
         }
 
         PublishCapture();
@@ -284,6 +282,11 @@ namespace NT
         s.mergeWindow = keep.mergeWindow;
         s.ypsLimit = keep.ypsLimit;
         s.drawIconFonts = keep.drawIconFonts;
+        // The layout lives on its own page with its own reset (right-click).
+        s.posX = keep.posX;
+        s.posY = keep.posY;
+        s.align = keep.align;
+        s.center = keep.center;
         SaveSettings();
     }
 

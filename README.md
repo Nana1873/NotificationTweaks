@@ -66,7 +66,8 @@ Vanilla HUD at once (the history keeps recording).
 ## Layout
 
 - `src/` plugin source: `Capture.*` hooks and line store, `Merge.*` merge
-  rules, `Markup.*` htmlText subset, `Overlay.*` drawing and drag mode,
+  rules, `Markup.*` htmlText subset, `Overlay.*` drawing and layout editor,
+  `CenterNotifications.*` placement of the center popups and HUD geometry,
   `MenuIntegration.*` menu pages, `Settings.*` INI, `Translation.*` UI strings,
   `SwfFont.*` SWF font parsing and rasterizing (pure), `IconFont.*` icon
   font loading and textures, `Text.h` shared text helpers

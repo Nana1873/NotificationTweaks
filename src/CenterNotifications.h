@@ -10,32 +10,45 @@
 // entry of the group starts showing.
 namespace NT::CenterNotifications
 {
-    // Text area of a group's frame in the positioning mode, in HUD units
-    // around the clip origin at scale 1 (measured on the Vanilla and
-    // Dragonborn UI HUD: the title line sits about 60 units below it).
-    inline constexpr float kTextOffsetY = 60.0F;
-    inline constexpr float kFrameWidth = 560.0F;
-    inline constexpr float kFrameHeight = 60.0F;
-
     // Game thread, from the HUDNotifications::Update hook, around the
     // Vanilla update: an entry that left the queue started showing.
     void BeforeUpdate(RE::HUDNotifications* a_this);
     void AfterUpdate(RE::HUDNotifications* a_this);
 
-    // Where the clip's Vanilla origin is on screen and how many screen
-    // pixels one HUD unit is; measured on the game thread about once a
-    // second. Invalid until the HUD has updated once.
+    // Where the clip's own origin is on screen, screen pixels per HUD unit
+    // and the HUD's own scale of the clip; measured on the game thread about
+    // once a second. Invalid until the HUD has updated once.
     struct Geometry
     {
         bool  valid = false;
         float originX = 0.0F;
         float originY = 0.0F;
-        float pxPerUnit = 1.0F;
+        float pxPerUnitX = 1.0F;
+        float pxPerUnitY = 1.0F;
+        float baseScaleX = 1.0F;
+        float baseScaleY = 1.0F;
+
+        // A group's title line on screen at a_place, as {left, top, right,
+        // bottom}: the box the layout editor draws. Measured on the Vanilla
+        // and Dragonborn UI HUD, the title sits about 60 units below the
+        // clip origin.
+        std::array<float, 4> TitleRect(const CenterPlacement& a_place) const
+        {
+            constexpr float kTextOffsetY = 60.0F;
+            constexpr float kWidth = 560.0F;
+            constexpr float kHeight = 60.0F;
+            const float     sx = a_place.scale * baseScaleX * pxPerUnitX;
+            const float     sy = a_place.scale * baseScaleY * pxPerUnitY;
+            const float     cx = originX + a_place.x * pxPerUnitX;
+            const float     cy = originY + a_place.y * pxPerUnitY + kTextOffsetY * sy;
+            return { cx - kWidth * 0.5F * sx, cy - kHeight * 0.5F * sy, cx + kWidth * 0.5F * sx, cy + kHeight * 0.5F * sy };
+        }
     };
     Geometry GetGeometry();
 
     // Test hook (VerboseLog only): a notification "NTDEBUG:<type>:<text>"
-    // becomes a HUD message of that HUD_MESSAGE_TYPE, sent the way Dynamic
-    // Location Pop-ups sends its popups. True when it was one.
+    // with the location type (26 on SE/AE, kLocationDiscovery) becomes a
+    // location popup, sent the way Dynamic Location Pop-ups sends them.
+    // True when the text was such a test line.
     bool HandleDebugMessage(std::string_view a_text);
 }

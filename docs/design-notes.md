@@ -18,7 +18,8 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   notification entries (no quest, no word of power) are taken out of the
   queue before Vanilla shows them. In every test so far all lines came
   through the first hook; the net never logged.
-- Quest, skill, level and other `HUDNotifications` types stay Vanilla.
+- Quest, skill, level and other `HUDNotifications` types keep their Vanilla
+  look (they can be moved and resized, see Center notifications).
 - Sounds: `HUDData` has no sound field, so a sound passed to
   `ShowHUDMessage` cannot ride the first path. Queue entries do carry one;
   the Update hook plays it before erasing the entry.
@@ -100,8 +101,10 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   (`AddWindow`) with Done replaces the main window. A yellow frame around
   the lines and a labelled box per center group (see Center
   notifications) follow a left-button drag; the mouse wheel resizes (lines:
-  font size; boxes: 5 % per notch), right-click puts it back. Every change
-  is saved right away. The window pauses the game, so nothing that needs
+  font size; boxes: 5 % per notch), right-click puts it back. A drag saves
+  on release, the wheel half a second after the last notch, right-click at
+  once. The topmost frame under the mouse takes a gesture (center boxes
+  above the lines), so one notch never changes two things. The window pauses the game, so nothing that needs
   the HUD to run (a sample popup) can be shown there; an earlier preview
   button was dropped for that reason.
 
@@ -207,23 +210,25 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   (Vanilla and Dragonborn UI `hudmenu.swf` alike), one entry at a time from
   the `HUDNotifications` queue, whose `root` is that clip.
 - `CenterNotifications` (game thread, around the `HUDNotifications::Update`
-  hook): when the front entry leaves the queue it starts showing, so the
-  clip gets that group's offset (HUD units) and scale via
-  `SetDisplayInfo`, relative to the Vanilla values read once; a group
-  without a placement, or a type that is no center group, puts it back.
-  Entries never overlap, so groups can sit in different places.
-  `[CenterNotifications]` holds `<Group>X/Y/Scale` for Location, Quest,
-  Skill, Shout.
-- The editor's boxes are drawn from a geometry measured about once a
-  second (`localToGlobal` of the clip origin through the movie's visible
-  frame): origin in screen pixels and pixels per HUD unit. The box is an
-  estimate of the title line (`kTextOffsetY`, `kFrameWidth/Height`); in
-  game a popup lands inside it.
+  hook): when the front entry leaves the queue it starts showing; if it is
+  a center type, the clip gets that group's offset (HUD units) and scale
+  via `SetDisplayInfo`, relative to the HUD's own values. Plain lines that
+  Vanilla still shows (capture off, undrawable icons) never touch the clip,
+  so a popup on screen is not moved. The HUD's own values are read again
+  whenever the clip is no longer where it was last set (a HUD mod moved it,
+  the movie reloaded). Center entries never overlap, so groups can sit in
+  different places. Types are mapped through `RE::GetHUDMessageType` (VR
+  shifts them by 3). `[CenterNotifications]` holds `<Group>X/Y/Scale` for
+  Location, Quest, Skill, Shout (`kCenterKeys`).
+- The editor's boxes come from a geometry measured about once a second
+  (`localToGlobal` of the clip origin through the movie's visible frame):
+  origin in screen pixels, pixels per HUD unit on each axis and the HUD's
+  own clip scale. `Geometry::TitleRect` estimates the title line from
+  that; in game a popup lands inside the box.
 - Test hook: with `VerboseLog=1` a notification `NTDEBUG:<type>:<text>`
-  becomes a HUD message of that type (26 = location), sent like DLP does.
-- Checked in game (AE 1.7.104, Dragonborn UI HUD): location popup and a
-  quest objective right after it each at their own place and size; boxes
-  drag, resize and reset; values survive a restart.
+  with the location type (`kLocationDiscovery`, 26 on SE/AE) becomes a
+  location popup, sent like DLP does; other types are refused (they would
+  need a quest or word of power).
 
 ## Testing notes
 
@@ -248,6 +253,9 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   repeat filter cleared after each taken line" and Papyrus A, B, A (1 s
   apart) arrives as three lines; ANQT itself and the menu were not run
   there.
+- Center notifications, checked in game (AE 1.7.104, Dragonborn UI HUD):
+  a location popup and a quest objective right after it each at their own
+  place and size; boxes drag, resize and reset; values survive a restart.
 - `tools/deploy.ps1 [-Register]`, then
   `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Most tests need
   no save: `coc riverwood` (DevBench console) from the main menu avoids

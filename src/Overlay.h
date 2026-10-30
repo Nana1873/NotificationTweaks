@@ -3,14 +3,14 @@
 #include "SKSEMenuFramework.h"
 
 // Draws the captured notifications on the SKSE Menu Framework HUD layer and
-// handles the drag-to-position mode.
+// the layout editor (the lines' frame and the center notification boxes).
 namespace NT::Overlay
 {
     // Registers the HUD element. kDataLoaded, after Capture::Install.
     void Initialize();
 
-    // Positioning mode: sample lines are shown and the block follows the mouse
-    // while the left button is held on it. Toggled by the menu.
+    // Layout editor: sample lines and the center notification boxes are
+    // shown and can be dragged, resized and reset. Toggled by the menu.
     void SetPositioning(bool a_on);
     bool IsPositioning();
 

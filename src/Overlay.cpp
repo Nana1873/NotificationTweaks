@@ -12,24 +12,50 @@ namespace
 {
     using ImGuiMCP::ImVec2;
 
-    constexpr float kCenterScaleStep = 0.05F;  // per mouse wheel notch in the layout editor
-
-    // Drag frame: minimum width around an empty block and padding, in pixels.
-    constexpr float kDragMinWidth = 160.0F;
-    constexpr float kDragPadding = 6.0F;
+    // Layout editor: the lines' frame (minimum width around an empty block,
+    // padding), the center boxes' look and the wheel steps.
+    constexpr float           kDragMinWidth = 160.0F;
+    constexpr float           kDragPadding = 6.0F;
+    constexpr ImGuiMCP::ImVec4 kLinesFrameRgb{ 1.0F, 0.85F, 0.3F, 1.0F };
+    constexpr ImGuiMCP::ImVec4 kCenterBoxRgb{ 0.45F, 0.8F, 1.0F, 1.0F };
+    constexpr ImGuiMCP::ImVec4 kCenterFillRgb{ 0.05F, 0.08F, 0.12F, 1.0F };
+    constexpr float           kCenterLabelPad = 4.0F;
+    constexpr float           kCenterScaleStep = 0.05F;  // per wheel notch
+    constexpr float           kFontSizeStep = 1.0F;      // px at 1080p per wheel notch
+    constexpr double          kWheelSaveDelay = 0.5;     // seconds after the last notch
 
     std::atomic<bool> g_positioning{ false };
-    ImVec2            g_grabOffset{ 0.0F, 0.0F };
 
-    // What the mouse holds in the positioning mode.
-    enum class DragTarget
+    // What the mouse holds in the layout editor, and where it took it.
+    enum class Target
     {
         kNone,
         kLines,
         kCenter
     };
-    DragTarget  g_dragTarget = DragTarget::kNone;
-    std::size_t g_dragGroup = 0;  // the center group held with kCenter
+    Target                 g_dragTarget = Target::kNone;
+    std::size_t            g_dragGroup = 0;  // the center group held with kCenter
+    ImVec2                 g_grabMouse{ 0.0F, 0.0F };
+    ImVec2                 g_grabLines{ 0.0F, 0.0F };  // posX/posY at grab
+    NT::CenterPlacement    g_grabPlace;                 // the group's placement at grab
+    double                 g_saveAt = 0.0;              // pending save (wheel), ImGui time; 0 = none
+
+    ImGuiMCP::ImU32 Rgba(const ImGuiMCP::ImVec4& a_rgb, float a_alpha)
+    {
+        return ImGuiMCP::ColorConvertFloat4ToU32({ a_rgb.x, a_rgb.y, a_rgb.z, a_alpha });
+    }
+
+    bool Contains(const std::pair<ImVec2, ImVec2>& a_rect, ImVec2 a_point)
+    {
+        return a_point.x >= a_rect.first.x && a_point.x <= a_rect.second.x && a_point.y >= a_rect.first.y && a_point.y <= a_rect.second.y;
+    }
+
+    const std::string& CenterName(std::size_t a_group)
+    {
+        const auto& t = NT::Translation::S();
+        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
+        return *names[a_group];
+    }
 
     struct Piece
     {
@@ -357,9 +383,13 @@ namespace
         }
     }
 
-    // Positioning mode: frame around the block; a left-button drag inside it
-    // moves the anchor and saves on release.
-    void HandleDrag(ImGuiMCP::ImDrawList* a_list, const std::vector<Block>& a_blocks, ImVec2 a_anchor, ImVec2 a_screen,
+    // Layout editor: the lines' frame and a labelled box per center group
+    // (where its title line shows). The topmost frame under the mouse takes
+    // the gesture: center boxes above the lines, Locations on top (the group
+    // most players move), so dragging one off the pile brings the next up.
+    // Left drag moves (saved on release), the wheel resizes (lines: font
+    // size; boxes: scale; saved shortly after), right-click puts it back.
+    void HandleLayoutEditor(ImGuiMCP::ImDrawList* a_list, const std::vector<Block>& a_blocks, ImVec2 a_anchor, ImVec2 a_screen,
         const Metrics& a_metrics, NT::Settings& a_settings)
     {
         float blockWidth = 0.0F;
@@ -370,134 +400,108 @@ namespace
                 blockHeight += a_metrics.lineHeight;
             }
         }
+        // Lines handle: the block's bounds (at least a small box at the anchor).
+        const float width = std::max(blockWidth, kDragMinWidth);
+        const float height = std::max(blockHeight, a_metrics.lineHeight);
+        const float left = a_anchor.x + AlignOffset(a_settings.align, width);
+        const std::pair<ImVec2, ImVec2> lines{ { left - kDragPadding, a_anchor.y - kDragPadding },
+            { left + width + kDragPadding, a_anchor.y + height + kDragPadding } };
 
-        // Drag handle: the block's bounds (at least a small box at the anchor).
-        const float  width = std::max(blockWidth, kDragMinWidth);
-        const float  height = std::max(blockHeight, a_metrics.lineHeight);
-        const float  left = a_anchor.x + AlignOffset(a_settings.align, width);
-        const ImVec2 min{ left - kDragPadding, a_anchor.y - kDragPadding };
-        const ImVec2 max{ left + width + kDragPadding, a_anchor.y + height + kDragPadding };
-        const auto   mouse = ImGuiMCP::GetMousePos();
-        const bool   inside = mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y;
-        const bool   overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
-
-        if (g_dragTarget == DragTarget::kNone && inside && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
-            g_dragTarget = DragTarget::kLines;
-            g_grabOffset = { mouse.x - a_anchor.x, mouse.y - a_anchor.y };
-        }
-        const bool dragging = g_dragTarget == DragTarget::kLines;
-        if (dragging) {
-            if (ImGuiMCP::IsMouseDown(0)) {
-                a_settings.posX = std::clamp((mouse.x - g_grabOffset.x) / a_screen.x, 0.0F, 1.0F);
-                a_settings.posY = std::clamp((mouse.y - g_grabOffset.y) / a_screen.y, 0.0F, 1.0F);
-            } else {
-                g_dragTarget = DragTarget::kNone;
-                NT::SaveSettings();
-                logs::info("Position set by dragging: {:.4f} / {:.4f}", a_settings.posX, a_settings.posY);
-            }
-        }
-
-        if (inside && !overWindow && g_dragTarget == DragTarget::kNone) {
-            if (ImGuiMCP::IsMouseClicked(1)) {
-                const NT::Settings defaults;
-                a_settings.posX = defaults.posX;
-                a_settings.posY = defaults.posY;
-                NT::SaveSettings();
-            } else if (const float wheel = ImGuiMCP::GetIO()->MouseWheel; wheel != 0.0F) {
-                a_settings.fontSize = std::clamp(a_settings.fontSize + wheel, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max);
-                NT::SaveSettings();
-            }
-        }
-
-        const bool active = dragging || (inside && !overWindow && g_dragTarget == DragTarget::kNone);
-        const auto frame = ImGuiMCP::ColorConvertFloat4ToU32({ 1.0F, 0.85F, 0.3F, active ? 1.0F : 0.6F });
-        ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, frame, 4.0F, 0, active ? 2.5F : 1.5F);
-        ImGuiMCP::ImDrawListManager::AddCircleFilled(a_list, a_anchor, 4.0F, frame, 12);
-    }
-
-    // Screen rect of a center group's text area at its placement.
-    std::pair<ImVec2, ImVec2> CenterFrame(const NT::CenterNotifications::Geometry& a_geometry, const NT::CenterPlacement& a_place)
-    {
-        using namespace NT::CenterNotifications;
-        const float unit = a_geometry.pxPerUnit;
-        const float cx = a_geometry.originX + a_place.x * unit;
-        const float cy = a_geometry.originY + (a_place.y + kTextOffsetY * a_place.scale) * unit;
-        const float halfW = kFrameWidth * 0.5F * a_place.scale * unit;
-        const float halfH = kFrameHeight * 0.5F * a_place.scale * unit;
-        return { { cx - halfW, cy - halfH }, { cx + halfW, cy + halfH } };
-    }
-
-    // Positioning mode: a labelled box per center group (where its title
-    // line shows), like a layout editor. All start on the Vanilla spot,
-    // stacked; a click takes the topmost box under the mouse, so dragging
-    // one away brings the next to the top. Saved on release.
-    void HandleCenterDrag(ImGuiMCP::ImDrawList* a_list, NT::Settings& a_settings)
-    {
         const auto geometry = NT::CenterNotifications::GetGeometry();
-        if (!geometry.valid) {
-            return;
+        std::array<std::pair<ImVec2, ImVec2>, NT::kCenterGroups> boxes{};
+        for (std::size_t i = 0; geometry.valid && i < NT::kCenterGroups; ++i) {
+            const auto r = geometry.TitleRect(a_settings.center[i]);
+            boxes[i] = { { r[0], r[1] }, { r[2], r[3] } };
         }
-        const auto&        t = NT::Translation::S();
-        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
-        const auto         mouse = ImGuiMCP::GetMousePos();
-        const bool         overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
 
-        // Drawn last = on top: locations, the group most players move.
-        constexpr std::array<std::size_t, NT::kCenterGroups> kDrawOrder = { 3, 2, 1, 0 };
-        std::array<std::pair<ImVec2, ImVec2>, NT::kCenterGroups> boxes;
-        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
-            boxes[i] = CenterFrame(geometry, a_settings.center[i]);
-        }
-        std::optional<std::size_t> hovered;
-        if (!overWindow) {
-            for (auto it = kDrawOrder.rbegin(); it != kDrawOrder.rend() && !hovered; ++it) {
-                const auto& [min, max] = boxes[*it];
-                if (mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) {
-                    hovered = *it;
+        // The frame under the mouse: center boxes in group order (0 on top),
+        // then the lines.
+        const auto mouse = ImGuiMCP::GetMousePos();
+        Target      hovered = Target::kNone;
+        std::size_t hoveredGroup = 0;
+        if (!ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow)) {
+            for (std::size_t i = 0; geometry.valid && i < NT::kCenterGroups && hovered == Target::kNone; ++i) {
+                if (Contains(boxes[i], mouse)) {
+                    hovered = Target::kCenter;
+                    hoveredGroup = i;
                 }
             }
+            if (hovered == Target::kNone && Contains(lines, mouse)) {
+                hovered = Target::kLines;
+            }
         }
 
-        if (g_dragTarget == DragTarget::kNone && hovered) {
-            auto& place = a_settings.center[*hovered];
+        if (g_dragTarget == Target::kNone && hovered != Target::kNone) {
+            auto* place = hovered == Target::kCenter ? &a_settings.center[hoveredGroup] : nullptr;
             if (ImGuiMCP::IsMouseClicked(0)) {
-                g_dragTarget = DragTarget::kCenter;
-                g_dragGroup = *hovered;
-                g_grabOffset = mouse;
+                g_dragTarget = hovered;
+                g_dragGroup = hoveredGroup;
+                g_grabMouse = mouse;
+                g_grabLines = { a_settings.posX, a_settings.posY };
+                g_grabPlace = place ? *place : NT::CenterPlacement{};
             } else if (ImGuiMCP::IsMouseClicked(1)) {
-                place = {};  // back to the HUD's own spot and size (Vanilla or a UI mod)
+                if (place) {
+                    *place = {};  // back to the HUD's own spot and size (Vanilla or a UI mod)
+                } else {
+                    const NT::Settings defaults;
+                    a_settings.posX = defaults.posX;
+                    a_settings.posY = defaults.posY;
+                }
                 NT::SaveSettings();
             } else if (const float wheel = ImGuiMCP::GetIO()->MouseWheel; wheel != 0.0F) {
-                place.scale = std::clamp(place.scale + wheel * kCenterScaleStep, NT::Limits::kCenterScale.min, NT::Limits::kCenterScale.max);
-                NT::SaveSettings();
-            }
-        }
-        const bool dragging = g_dragTarget == DragTarget::kCenter;
-        if (dragging) {
-            if (ImGuiMCP::IsMouseDown(0)) {
-                auto& place = a_settings.center[g_dragGroup];
-                place.x = std::clamp(place.x + (mouse.x - g_grabOffset.x) / geometry.pxPerUnit, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
-                place.y = std::clamp(place.y + (mouse.y - g_grabOffset.y) / geometry.pxPerUnit, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
-                g_grabOffset = mouse;
-            } else {
-                g_dragTarget = DragTarget::kNone;
-                NT::SaveSettings();
-                logs::info("Center notifications ({}) moved by dragging", *names[g_dragGroup]);
+                if (place) {
+                    place->scale = std::clamp(place->scale + wheel * kCenterScaleStep, NT::Limits::kCenterScale.min, NT::Limits::kCenterScale.max);
+                } else {
+                    a_settings.fontSize = std::clamp(a_settings.fontSize + wheel * kFontSizeStep, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max);
+                }
+                g_saveAt = ImGuiMCP::GetTime() + kWheelSaveDelay;  // one file write per scroll, not per notch
             }
         }
 
-        // A dark title bar hides the labels of the boxes below, so only the top
-        // one reads; the inside stays see-through, so the HUD shows through.
-        const float barHeight = ImGuiMCP::GetTextLineHeight() + 8.0F;
-        for (const auto i : kDrawOrder) {
+        if (g_dragTarget != Target::kNone) {
+            const ImVec2 delta{ mouse.x - g_grabMouse.x, mouse.y - g_grabMouse.y };
+            if (ImGuiMCP::IsMouseDown(0)) {
+                if (g_dragTarget == Target::kLines) {
+                    a_settings.posX = std::clamp(g_grabLines.x + delta.x / a_screen.x, 0.0F, 1.0F);
+                    a_settings.posY = std::clamp(g_grabLines.y + delta.y / a_screen.y, 0.0F, 1.0F);
+                } else if (geometry.valid) {
+                    auto& place = a_settings.center[g_dragGroup];
+                    place.x = std::clamp(g_grabPlace.x + delta.x / geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
+                    place.y = std::clamp(g_grabPlace.y + delta.y / geometry.pxPerUnitY, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
+                }
+            } else {
+                logs::info("Layout editor: {} moved", g_dragTarget == Target::kLines ? "lines" : NT::kCenterKeys[g_dragGroup]);
+                g_dragTarget = Target::kNone;
+                NT::SaveSettings();
+            }
+        }
+        if (g_saveAt > 0.0 && ImGuiMCP::GetTime() >= g_saveAt) {
+            g_saveAt = 0.0;
+            NT::SaveSettings();
+        }
+
+        const auto active = [&](Target a_target, std::size_t a_group) {
+            const Target held = g_dragTarget != Target::kNone ? g_dragTarget : hovered;
+            const std::size_t group = g_dragTarget != Target::kNone ? g_dragGroup : hoveredGroup;
+            return held == a_target && (a_target != Target::kCenter || group == a_group);
+        };
+
+        const bool linesActive = active(Target::kLines, 0);
+        ImGuiMCP::ImDrawListManager::AddRect(a_list, lines.first, lines.second, Rgba(kLinesFrameRgb, linesActive ? 1.0F : 0.6F), 4.0F, 0,
+            linesActive ? 2.5F : 1.5F);
+        ImGuiMCP::ImDrawListManager::AddCircleFilled(a_list, a_anchor, 4.0F, Rgba(kLinesFrameRgb, linesActive ? 1.0F : 0.6F), 12);
+
+        // Drawn bottom to top. A dark title bar hides the labels of the boxes
+        // below, so only the top one reads; the inside stays see-through.
+        const float barHeight = ImGuiMCP::GetTextLineHeight() + 2.0F * kCenterLabelPad;
+        for (std::size_t i = NT::kCenterGroups; geometry.valid && i-- > 0;) {
             const auto& [min, max] = boxes[i];
-            const bool  active = dragging ? g_dragGroup == i : (hovered == i && g_dragTarget == DragTarget::kNone);
-            const auto  color = ImGuiMCP::ColorConvertFloat4ToU32({ 0.45F, 0.8F, 1.0F, active ? 1.0F : 0.7F });
-            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, max, ImGuiMCP::ColorConvertFloat4ToU32({ 0.05F, 0.08F, 0.12F, 0.2F }), 4.0F, 0);
-            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, { max.x, std::min(max.y, min.y + barHeight) },
-                ImGuiMCP::ColorConvertFloat4ToU32({ 0.05F, 0.08F, 0.12F, 0.9F }), 4.0F, 0);
-            ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, color, 4.0F, 0, active ? 2.5F : 1.5F);
-            ImGuiMCP::ImDrawListManager::AddText(a_list, { min.x + 6.0F, min.y + 4.0F }, color, names[i]->c_str(), nullptr);
+            const bool  on = active(Target::kCenter, i);
+            const auto  color = Rgba(kCenterBoxRgb, on ? 1.0F : 0.7F);
+            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, max, Rgba(kCenterFillRgb, 0.2F), 4.0F, 0);
+            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, { max.x, std::min(max.y, min.y + barHeight) }, Rgba(kCenterFillRgb, 0.9F), 4.0F, 0);
+            ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, color, 4.0F, 0, on ? 2.5F : 1.5F);
+            ImGuiMCP::ImDrawListManager::AddText(a_list, { min.x + 1.5F * kCenterLabelPad, min.y + kCenterLabelPad }, color, CenterName(i).c_str(), nullptr);
         }
     }
 
@@ -540,10 +544,9 @@ namespace
         DrawBlocks(list, blocks, anchor, metrics, s);
 
         if (positioning) {
-            HandleDrag(list, blocks, anchor, screen, metrics, s);
-            HandleCenterDrag(list, s);
+            HandleLayoutEditor(list, blocks, anchor, screen, metrics, s);
         } else {
-            g_dragTarget = DragTarget::kNone;
+            g_dragTarget = Target::kNone;
         }
     }
 }
@@ -560,7 +563,8 @@ namespace NT::Overlay
     {
         g_positioning = a_on;
         if (!a_on) {
-            g_dragTarget = DragTarget::kNone;
+            g_dragTarget = Target::kNone;
+            g_saveAt = 0.0;  // the caller saves when the editor closes
         }
     }
 
