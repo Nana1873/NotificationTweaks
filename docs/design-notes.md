@@ -96,11 +96,17 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   Character Glyphs) into its fonts. A line whose letters the chosen font
   lacks (`ImFont_FindGlyphNoFallback`; ASCII, punctuation U+2000-206F and
   icon runs not checked) is drawn in the first atlas font that has them
-  all; only that line switches, so a German font keeps its umlauts. The
-  language fonts must not simply be chosen as the main font: SMF's RU font
-  puts Cyrillic letters on the Latin-1 code points (ä shows as д). A line
-  no font fits stays as it is ("?") and the Display page shows a hint
-  where to set the glyphs; the hint clears once such a line fits again.
+  all (the framework's default font first; a candidate needs Latin
+  letters, so icon fonts never qualify). Only that line switches, so a
+  German font keeps its umlauts. The language fonts must not simply be
+  chosen as the main font: SMF's RU font puts Cyrillic letters on the
+  Latin-1 code points (ä shows as д). A line no font fits stays as it is
+  ("?") and the Display page shows a hint where to set the glyphs. The
+  hint is decided per frame: set when a line fits no font, cleared when
+  lines needed another font and all found one, kept otherwise (so it is
+  still there after the line has faded).
+- Layout editor without a gamepad path since 1.3.0: the position sliders
+  were removed with the Layout page, so moving needs mouse and keyboard.
 - Hidden while the HUD movie is invisible, at the main menu and during
   loading screens. With `ShowInMenus` off (default), lines wait while a
   full-screen menu is open and appear when it closes; those menus are detected by name because

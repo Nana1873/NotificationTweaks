@@ -26,8 +26,8 @@ namespace NT
         T max;
     };
 
-    // Allowed values: LoadSettings clamps the INI to them and the menu's
-    // sliders use the same bounds.
+    // Allowed values: LoadSettings clamps the INI to them and the menu and
+    // the layout editor use the same bounds.
     namespace Limits
     {
         inline constexpr Range<float> kPos{ 0.0F, 1.0F };

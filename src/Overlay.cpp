@@ -22,8 +22,9 @@ namespace
     constexpr float           kCenterLabelPad = 4.0F;
     constexpr float           kCenterScaleStep = 0.05F;  // per wheel notch
     constexpr float           kFontSizeStep = 1.0F;      // px at 1080p per wheel notch
-    constexpr double          kWheelSaveDelay = 0.5;     // seconds after the last notch or arrow key
-    constexpr float           kArrowStep = 1.0F;         // screen pixels per arrow key press (Shift: x10)
+    constexpr double          kDeferredSaveDelay = 0.5;  // seconds after the last wheel notch or arrow key
+    constexpr float           kArrowStep = 1.0F;         // screen pixels per arrow key press
+    constexpr float           kArrowStepShift = 10.0F;   // the same with Shift held
 
     std::atomic<bool> g_positioning{ false };
 
@@ -41,7 +42,7 @@ namespace
     ImVec2                 g_grabMouse{ 0.0F, 0.0F };
     ImVec2                 g_grabLines{ 0.0F, 0.0F };  // left edge and top of the lines' block at grab, screen pixels
     NT::CenterPlacement    g_grabPlace;                 // the group's placement at grab
-    double                 g_saveAt = 0.0;              // pending save (wheel), ImGui time; 0 = none
+    double                 g_saveAt = 0.0;              // pending save (wheel, arrows), ImGui time; 0 = none
 
     ImGuiMCP::ImU32 Rgba(const ImGuiMCP::ImVec4& a_rgb, float a_alpha)
     {
@@ -96,17 +97,32 @@ namespace
 
     // A line in another alphabet that no loaded font has (SMF loads only the
     // Character Glyphs chosen in its settings); shown as a hint in the menu.
-    // Cleared once such a line finds a font again.
+    // Set by a frame with such a line, cleared by a frame whose lines in
+    // other alphabets all found a font; otherwise kept, so the hint is still
+    // there when the menu is opened after the line has faded.
     std::atomic<bool> g_missingGlyphs{ false };
+
+    // Not checked by HasGlyphs: general punctuation (… and the like) and
+    // the replacement for broken UTF-8.
+    constexpr char32_t kPunctuationFirst = 0x2000;
+    constexpr char32_t kPunctuationLast = 0x206F;
+    constexpr char32_t kReplacementChar = 0xFFFD;
 
     // True when a_font has a glyph for every letter of a_runs. ASCII, icon
     // runs, general punctuation (… and the like), code points beyond the
     // 16-bit ImWchar and broken UTF-8 are not checked: no alphabet font
     // changes how they show.
+    using FindGlyphFn = const ImGuiMCP::ImFontGlyph* (*)(ImGuiMCP::ImFont*, ImGuiMCP::ImWchar);
+
+    FindGlyphFn FindGlyph()
+    {
+        static const auto find = GetMenuFrameworkFunction<FindGlyphFn>("ImFont_FindGlyphNoFallback");
+        return find;
+    }
+
     bool HasGlyphs(ImGuiMCP::ImFont* a_font, const std::vector<NT::Markup::Run>& a_runs)
     {
-        using FindGlyph = const ImGuiMCP::ImFontGlyph* (*)(ImGuiMCP::ImFont*, ImGuiMCP::ImWchar);
-        static const auto find = GetMenuFrameworkFunction<FindGlyph>("ImFont_FindGlyphNoFallback");
+        const auto find = FindGlyph();
         if (!find || !a_font) {
             return true;
         }
@@ -116,7 +132,7 @@ namespace
             }
             for (std::size_t i = 0; i < run.text.size();) {
                 const auto code = NT::Text::NextCodePoint(run.text, i);
-                if (code < 0x80 || code > 0xFFFF || (code >= 0x2000 && code <= 0x206F) || code == U'�') {
+                if (code < 0x80 || code > 0xFFFF || (code >= kPunctuationFirst && code <= kPunctuationLast) || code == kReplacementChar) {
                     continue;
                 }
                 if (!find(a_font, static_cast<ImGuiMCP::ImWchar>(code))) {
@@ -127,25 +143,35 @@ namespace
         return true;
     }
 
-    // The chosen font, or for a line it lacks letters of the first atlas
-    // font that has them all (SMF's language fonts: RU, PL, CN, ...). Only
-    // that line switches; a line no font fits stays in the chosen one.
-    ImGuiMCP::ImFont* FontFor(const std::vector<NT::Markup::Run>& a_runs, ImGuiMCP::ImFont* a_chosen)
+    // How the lines of one frame fared with FontFor.
+    struct GlyphCheck
+    {
+        bool fallback = false;  // a line switched to another font
+        bool missing = false;   // a line no font fits
+    };
+
+    // The chosen font, or for a line it lacks letters of the framework's
+    // default font or else the first atlas font that has them all (SMF's
+    // language fonts: RU, PL, CN, ...). Only that line switches; a line no
+    // font fits stays in the chosen one. A candidate needs Latin letters too
+    // (HasGlyphs skips ASCII), so an icon font never takes a line.
+    ImGuiMCP::ImFont* FontFor(const std::vector<NT::Markup::Run>& a_runs, ImGuiMCP::ImFont* a_chosen, GlyphCheck& a_check)
     {
         if (HasGlyphs(a_chosen, a_runs)) {
             return a_chosen;
         }
-        if (auto* io = ImGuiMCP::GetIO(); io && io->Fonts) {
+        const auto fits = [&](ImGuiMCP::ImFont* a_font) {
+            return a_font && a_font != a_chosen && FindGlyph()(a_font, 'a') && HasGlyphs(a_font, a_runs);
+        };
+        auto* found = fits(ImGuiMCP::GetFont()) ? ImGuiMCP::GetFont() : nullptr;
+        if (auto* io = ImGuiMCP::GetIO(); !found && io && io->Fonts) {
             const auto& fonts = io->Fonts->Fonts;
-            for (int i = 0; i < fonts.Size; ++i) {
-                if (fonts.Data[i] != a_chosen && HasGlyphs(fonts.Data[i], a_runs)) {
-                    g_missingGlyphs = false;
-                    return fonts.Data[i];
-                }
+            for (int i = 0; i < fonts.Size && !found; ++i) {
+                found = fits(fonts.Data[i]) ? fonts.Data[i] : nullptr;
             }
         }
-        g_missingGlyphs = true;
-        return a_chosen;
+        (found ? a_check.fallback : a_check.missing) = true;
+        return found ? found : a_chosen;
     }
 
     float Measure(ImGuiMCP::ImFont* a_font, float a_size, std::string_view a_text)
@@ -404,18 +430,22 @@ namespace
         const NT::Settings& a_settings)
     {
         std::vector<Block> blocks;
+        GlyphCheck         check;
         if (a_positioning && a_entries.empty()) {
             const auto& strings = NT::Translation::S();
             for (const auto* sample : { &strings.sample1, &strings.sample2 }) {
                 const auto  runs = NT::Markup::Parse(*sample);
-                auto* const font = FontFor(runs, a_metrics.font);
+                auto* const font = FontFor(runs, a_metrics.font, check);
                 blocks.push_back({ Layout(runs, 1, font, a_metrics.size, a_metrics.maxWidth, false), 1.0F, font });
             }
         } else {
             for (const auto& entry : a_entries) {
-                auto* const font = FontFor(entry.runs, a_metrics.font);
+                auto* const font = FontFor(entry.runs, a_metrics.font, check);
                 blocks.push_back({ Layout(entry.runs, entry.count, font, a_metrics.size, a_metrics.maxWidth, a_settings.drawIconFonts), Alpha(entry, a_settings), font });
             }
+        }
+        if (check.missing || check.fallback) {
+            g_missingGlyphs = check.missing;
         }
         if (a_settings.newestOnTop) {
             std::ranges::reverse(blocks);
@@ -444,12 +474,6 @@ namespace
         }
     }
 
-    // Layout editor: the lines' frame and a labelled box per center group
-    // (where its title line shows). The topmost frame under the mouse takes
-    // the gesture: center boxes above the lines, Locations on top (the group
-    // most players move), so dragging one off the pile brings the next up.
-    // Left drag moves (saved on release), the wheel resizes (lines: font
-    // size; boxes: scale; saved shortly after), right-click puts it back.
     // Places the lines' block with its left edge at a_left and its top at
     // a_top (screen pixels). The alignment follows the block's center: left
     // third left-aligned, right third right-aligned (lines grow away from
@@ -458,9 +482,25 @@ namespace
     {
         const float center = a_left + a_width * 0.5F;
         a_settings.align = center < a_screen.x / 3.0F ? NT::Align::kLeft : center > a_screen.x * 2.0F / 3.0F ? NT::Align::kRight : NT::Align::kCenter;
-        a_settings.posX = std::clamp((a_left - AlignOffset(a_settings.align, a_width)) / a_screen.x, 0.0F, 1.0F);
-        a_settings.posY = std::clamp(a_top / a_screen.y, 0.0F, 1.0F);
+        a_settings.posX = std::clamp((a_left - AlignOffset(a_settings.align, a_width)) / a_screen.x, NT::Limits::kPos.min, NT::Limits::kPos.max);
+        a_settings.posY = std::clamp(a_top / a_screen.y, NT::Limits::kPos.min, NT::Limits::kPos.max);
     }
+
+    // A center group's placement: a_from moved by a_delta screen pixels.
+    void MoveCenter(NT::CenterPlacement& a_place, const NT::CenterPlacement& a_from, ImVec2 a_delta,
+        const NT::CenterNotifications::Geometry& a_geometry)
+    {
+        a_place.x = std::clamp(a_from.x + a_delta.x / a_geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
+        a_place.y = std::clamp(a_from.y + a_delta.y / a_geometry.pxPerUnitY, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
+    }
+
+    // Layout editor: the lines' frame and a labelled box per center group
+    // (where its title line shows). The topmost frame under the mouse takes
+    // the gesture: center boxes above the lines, Locations on top (the group
+    // most players move), so dragging one off the pile brings the next up.
+    // Left drag moves (saved on release), the wheel resizes (lines: font
+    // size; boxes: scale), arrow keys move the last clicked frame (both
+    // saved shortly after), right-click puts it back.
 
     void HandleLayoutEditor(ImGuiMCP::ImDrawList* a_list, const std::vector<Block>& a_blocks, ImVec2 a_anchor, ImVec2 a_screen,
         const Metrics& a_metrics, NT::Settings& a_settings)
@@ -530,7 +570,7 @@ namespace
                 } else {
                     a_settings.fontSize = std::clamp(a_settings.fontSize + wheel * kFontSizeStep, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max);
                 }
-                g_saveAt = ImGuiMCP::GetTime() + kWheelSaveDelay;  // one file write per scroll, not per notch
+                g_saveAt = ImGuiMCP::GetTime() + kDeferredSaveDelay;  // one file write per scroll, not per notch
             }
         }
 
@@ -540,9 +580,7 @@ namespace
                 if (g_dragTarget == Target::kLines) {
                     PlaceLines(a_settings, g_grabLines.x + delta.x, g_grabLines.y + delta.y, width, a_screen);
                 } else if (geometry.valid) {
-                    auto& place = a_settings.center[g_dragGroup];
-                    place.x = std::clamp(g_grabPlace.x + delta.x / geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
-                    place.y = std::clamp(g_grabPlace.y + delta.y / geometry.pxPerUnitY, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
+                    MoveCenter(a_settings.center[g_dragGroup], g_grabPlace, delta, geometry);
                 }
             } else {
                 logs::info("Layout editor: {} moved", g_dragTarget == Target::kLines ? "lines" : NT::kCenterKeys[g_dragGroup]);
@@ -552,7 +590,8 @@ namespace
         }
         // Arrow keys: fine moves of the selected frame, one pixel (Shift: ten).
         if (g_dragTarget == Target::kNone) {
-            const float step = kArrowStep * (ImGuiMCP::IsKeyDown(ImGuiMCP::ImGuiMod_Shift) ? 10.0F : 1.0F);
+            const bool  shift = ImGuiMCP::IsKeyDown(ImGuiMCP::ImGuiKey_LeftShift) || ImGuiMCP::IsKeyDown(ImGuiMCP::ImGuiKey_RightShift);
+            const float step = shift ? kArrowStepShift : kArrowStep;
             const ImVec2 move{ (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_RightArrow) ? step : 0.0F) -
                                    (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_LeftArrow) ? step : 0.0F),
                 (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_DownArrow) ? step : 0.0F) -
@@ -562,10 +601,9 @@ namespace
                     PlaceLines(a_settings, left + move.x, a_anchor.y + move.y, width, a_screen);
                 } else if (geometry.valid) {
                     auto& place = a_settings.center[g_selectedGroup];
-                    place.x = std::clamp(place.x + move.x / geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
-                    place.y = std::clamp(place.y + move.y / geometry.pxPerUnitY, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
+                    MoveCenter(place, place, move, geometry);
                 }
-                g_saveAt = ImGuiMCP::GetTime() + kWheelSaveDelay;
+                g_saveAt = ImGuiMCP::GetTime() + kDeferredSaveDelay;
             }
         }
         if (g_saveAt > 0.0 && ImGuiMCP::GetTime() >= g_saveAt) {

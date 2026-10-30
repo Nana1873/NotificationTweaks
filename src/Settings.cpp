@@ -282,7 +282,7 @@ namespace NT
         s.mergeWindow = keep.mergeWindow;
         s.ypsLimit = keep.ypsLimit;
         s.drawIconFonts = keep.drawIconFonts;
-        // The layout lives on its own page with its own reset (right-click).
+        // The layout editor has its own reset (right-click).
         s.posX = keep.posX;
         s.posY = keep.posY;
         s.align = keep.align;
