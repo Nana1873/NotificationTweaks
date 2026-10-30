@@ -237,7 +237,10 @@ namespace
         const char* begin = a_piece.text.c_str();
         const char* end = begin + a_piece.text.size();
         const auto  shadow = ImGuiMCP::ColorConvertFloat4ToU32({ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha * a_settings.textColor[3] });
-        const float o = std::max(1.0F, a_size / 18.0F);
+        // Whole pixels: ImGui truncates each text start, so a fractional
+        // offset came out 1 or 2 px depending on the line's y (shadow visible
+        // on some lines, hidden under the text on others).
+        const float o = std::max(1.0F, std::round(a_size / 18.0F));
         // Icons: the white glyph image tinted like text, its box one line high.
         const auto draw = [&](float a_dx, float a_dy, ImGuiMCP::ImU32 a_color) {
             const ImVec2 pos{ a_pos.x + a_dx, a_pos.y + a_dy };
