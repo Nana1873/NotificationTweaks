@@ -15,7 +15,7 @@ namespace NT::Translation
     {
         std::string pageDisplay = "Display";
         std::string pageLayout = "Layout";
-        std::string layoutHint = "Move the notification lines and the big notifications in the middle of the screen (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). In the editor: drag a frame to move it, use the mouse wheel to resize it, right-click it to put it back.";
+        std::string layoutHint = "Move the notification lines and the big notifications in the middle of the screen (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). In the editor: drag a frame to move it, arrow keys for fine steps, mouse wheel to resize it, right-click to put it back.";
         std::string pageCompat = "Compatibility";
         std::string pageHistory = "History";
         std::string historyHint = "The last 100 notifications of this session, newest first.";
@@ -32,15 +32,12 @@ namespace NT::Translation
         std::string headAdvanced = "Advanced";
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";
-        std::string headPosition = "Position";
         std::string dragButton = "Edit layout...";
         std::string dragTip = "Closes this menu and shows a frame for everything that can be moved.";
         std::string centerLocation = "Locations";
         std::string centerQuest = "Quests";
         std::string centerSkill = "Skills and level";
         std::string centerShout = "Words of power";
-        std::string posX = "Horizontal";
-        std::string posY = "Vertical";
         std::string align = "Alignment";
         std::string alignLeft = "Left";
         std::string alignCenter = "Center";

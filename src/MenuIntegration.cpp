@@ -131,7 +131,8 @@ namespace
         ImGuiMCP::SetNextWindowPos({ viewport->Size.x * 0.5F, viewport->Size.y * 0.82F }, ImGuiMCP::ImGuiCond_Appearing, { 0.5F, 0.5F });
         bool open = true;
         if (ImGuiMCP::Begin((t.posWindowTitle + "###NTPosition").c_str(), &open,
-                ImGuiMCP::ImGuiWindowFlags_AlwaysAutoResize | ImGuiMCP::ImGuiWindowFlags_NoCollapse)) {
+                // No keyboard navigation: the arrow keys move the selected frame.
+                ImGuiMCP::ImGuiWindowFlags_AlwaysAutoResize | ImGuiMCP::ImGuiWindowFlags_NoCollapse | ImGuiMCP::ImGuiWindowFlags_NoNav)) {
             ImGuiMCP::TextUnformatted(t.posWindowHint.c_str());
             int align = static_cast<int>(s.align);
             if (Combo(t.align, "##palign", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
@@ -170,6 +171,11 @@ namespace
 
         Commit(ImGuiMCP::Checkbox((t.enabled + "##enabled").c_str(), &s.enabled));
         Tooltip(t.enabledTip);
+        int align = static_cast<int>(s.align);
+        if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
+            s.align = static_cast<NT::Align>(align);
+            NT::SaveSettings();
+        }
 
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
@@ -227,12 +233,10 @@ namespace
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
     }
 
-    // Page "Layout": the editor for everything that can be moved, plus the
-    // lines' alignment and fine position (for a gamepad, which cannot drag).
+    // Page "Layout": the editor for everything that can be moved.
     void __stdcall RenderLayout()
     {
         const auto& t = NT::Translation::S();
-        auto&       s = NT::Config();
         ImGuiMCP::PushTextWrapPos(0.0F);
         ImGuiMCP::TextDisabled("%s", t.layoutHint.c_str());
         ImGuiMCP::PopTextWrapPos();
@@ -240,15 +244,6 @@ namespace
             OpenPositioning();
         }
         Tooltip(t.dragTip);
-
-        ImGuiMCP::SeparatorText(t.headPosition.c_str());
-        int align = static_cast<int>(s.align);
-        if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
-            s.align = static_cast<NT::Align>(align);
-            NT::SaveSettings();
-        }
-        PercentSlider(t.posX, "##posx", s.posX, NT::Limits::kPos);
-        PercentSlider(t.posY, "##posy", s.posY, NT::Limits::kPos);
     }
 
     void __stdcall RenderCompat()

@@ -169,15 +169,12 @@ namespace NT::Translation
         g_strings.headAdvanced = Translate("$NT_HeadAdvanced", defaults.headAdvanced);
         g_strings.enabled = Translate("$NT_Enabled", defaults.enabled);
         g_strings.enabledTip = Translate("$NT_EnabledTip", defaults.enabledTip);
-        g_strings.headPosition = Translate("$NT_HeadPosition", defaults.headPosition);
         g_strings.dragButton = Translate("$NT_DragButton", defaults.dragButton);
         g_strings.dragTip = Translate("$NT_DragTip", defaults.dragTip);
         g_strings.centerLocation = Translate("$NT_CenterLocation", defaults.centerLocation);
         g_strings.centerQuest = Translate("$NT_CenterQuest", defaults.centerQuest);
         g_strings.centerSkill = Translate("$NT_CenterSkill", defaults.centerSkill);
         g_strings.centerShout = Translate("$NT_CenterShout", defaults.centerShout);
-        g_strings.posX = Translate("$NT_PosX", defaults.posX);
-        g_strings.posY = Translate("$NT_PosY", defaults.posY);
         g_strings.align = Translate("$NT_Align", defaults.align);
         g_strings.alignLeft = Translate("$NT_AlignLeft", defaults.alignLeft);
         g_strings.alignCenter = Translate("$NT_AlignCenter", defaults.alignCenter);
