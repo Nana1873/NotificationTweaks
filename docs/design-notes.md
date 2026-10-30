@@ -67,11 +67,14 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   ShowHUDMessage (SE 52050 / AE 52933) also drops a line sent with
   `cancelIfAlreadyQueued` (Debug.Notification, most plugins) whose text
   hash is among the last eight of the past 5 s; Auto Nearby Quest Tracker
-  lost its newest state that way. On the AE versions whose Address
-  Library was checked (1.6.317 to 1.6.1179, 1.7.99, 1.7.104) the plugin
-  clears that table (ID 406616, 8 x {u32 hash, u32 ms}, checked at startup
-  against the guard right behind it, ID 406624) after each line it takes,
-  unless stacking is off. SE, VR and newer runtimes keep the filter.
+  lost its newest state that way. On the versions whose Address Library
+  was checked the plugin clears that table (8 x {u32 hash, u32 ms},
+  checked at startup against the static-init guard right behind it) after
+  each line it takes, unless stacking is off: SE 1.5.97 (table 520091,
+  guard 520093, read from the running code in the SE test instance, since
+  the SE exe is encrypted on disk) and AE 1.6.317 to 1.6.1179, 1.7.99,
+  1.7.104 (406616, 406624). Other SE versions, VR and newer runtimes keep
+  the filter.
   Trade-offs: interleaved repeats (A, B, A, B) now each get a line, and a
   script sending A, B, A within one frame still loses the second A (the
   table is cleared on the main thread after the sender recorded it; a hook

@@ -177,20 +177,28 @@ namespace
 
     // The engine's repeat filter in ShowHUDMessage (SE 52050 / AE 52933),
     // see design-notes, Merge rules, "Repeats". We stack repeats ourselves, so it is
-    // cleared after each line we take. Only on the AE versions whose layout
-    // was checked (Install); the SE ID of the table is unverified.
+    // cleared after each line we take. Only on the versions whose layout was
+    // checked (Install).
     struct RecentMessage
     {
         std::uint32_t hash;
         std::uint32_t timeMs;
     };
     constexpr std::size_t kRecentMessageSlots = 8;
-    constexpr std::uint64_t kRecentMessagesAE = 406616;
-    constexpr std::uint64_t kRecentMessagesGuardAE = 406624;  // static-init guard right behind the table
-    // The AE versions whose Address Library was checked to have both IDs,
-    // 64 bytes apart. A missing ID would stop the game at startup (NG's
-    // lookup does not fail softly), so any other version is left alone.
-    constexpr REL::Version kRepeatFilterVersions[] = { { 1, 6, 317, 0 }, { 1, 6, 318, 0 }, { 1, 6, 323, 0 }, { 1, 6, 342, 0 },
+
+    // Table and its static-init guard right behind it, per runtime.
+    struct RepeatFilterIds
+    {
+        std::uint64_t table;
+        std::uint64_t guard;
+    };
+    constexpr RepeatFilterIds kRepeatFilterSE{ 520091, 520093 };  // read from the running 1.5.97 code
+    constexpr RepeatFilterIds kRepeatFilterAE{ 406616, 406624 };
+    // The versions whose Address Library was checked to have both IDs, 64
+    // bytes apart. A missing ID would stop the game at startup (NG's lookup
+    // does not fail softly), so any other version is left alone.
+    constexpr REL::Version kRepeatFilterVersionsSE[] = { { 1, 5, 97, 0 } };
+    constexpr REL::Version kRepeatFilterVersionsAE[] = { { 1, 6, 317, 0 }, { 1, 6, 318, 0 }, { 1, 6, 323, 0 }, { 1, 6, 342, 0 },
         { 1, 6, 353, 0 }, { 1, 6, 629, 0 }, { 1, 6, 640, 0 }, { 1, 6, 659, 0 }, { 1, 6, 1130, 0 }, { 1, 6, 1170, 0 },
         { 1, 6, 1179, 0 }, { 1, 7, 99, 0 }, { 1, 7, 104, 0 } };
 
@@ -199,16 +207,21 @@ namespace
     void FindEngineRepeatFilter()
     {
         const auto version = REL::Module::get().version();
-        if (!REL::Module::IsAE() || std::ranges::find(kRepeatFilterVersions, version) == std::ranges::end(kRepeatFilterVersions)) {
+        const auto checked = [&](std::span<const REL::Version> a_versions) { return std::ranges::find(a_versions, version) != a_versions.end(); };
+        const auto ids = REL::Module::IsAE() && checked(kRepeatFilterVersionsAE) ? std::optional{ kRepeatFilterAE } :
+                         REL::Module::IsSE() && checked(kRepeatFilterVersionsSE) ? std::optional{ kRepeatFilterSE } :
+                                                                                   std::nullopt;
+        if (!ids) {
             logs::info("Engine repeat filter left alone on {}", version.string());
             return;
         }
-        const auto table = REL::ID(kRecentMessagesAE).address();
-        if (REL::ID(kRecentMessagesGuardAE).address() - table != kRecentMessageSlots * sizeof(RecentMessage)) {
+        const auto table = REL::ID(ids->table).address();
+        if (REL::ID(ids->guard).address() - table != kRecentMessageSlots * sizeof(RecentMessage)) {
             logs::warn("Engine repeat filter: unexpected layout, left alone");
             return;
         }
         g_recentMessages = reinterpret_cast<RecentMessage*>(table);
+        logs::info("Engine repeat filter cleared after each taken line on {}", version.string());
     }
 
     void ClearEngineRepeatFilter()
