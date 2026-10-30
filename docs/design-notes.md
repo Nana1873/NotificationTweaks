@@ -97,7 +97,7 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   full-screen menu is open and appear when it closes; those menus are detected by name because
   Skyrim Souls RE keeps them unpaused, so `GameIsPaused()` is false there.
   Dialogue is not on the list: lines show during conversations.
-- Layout editor ("Edit layout...", page Layout): an SMF window
+- Layout editor ("Edit layout..." on the Display page): an SMF window
   (`AddWindow`) with Done replaces the main window. A yellow frame around
   the lines and a labelled box per center group (see Center
   notifications) follow a left-button drag; the mouse wheel resizes (lines:

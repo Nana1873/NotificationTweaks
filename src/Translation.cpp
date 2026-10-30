@@ -151,8 +151,6 @@ namespace NT::Translation
     {
         Strings defaults;
         g_strings.pageDisplay = Translate("$NT_PageDisplay", defaults.pageDisplay);
-        g_strings.pageLayout = Translate("$NT_PageLayout", defaults.pageLayout);
-        g_strings.layoutHint = Translate("$NT_LayoutHint", defaults.layoutHint);
         g_strings.pageCompat = Translate("$NT_PageCompat", defaults.pageCompat);
         g_strings.pageHistory = Translate("$NT_PageHistory", defaults.pageHistory);
         g_strings.historyHint = Translate("$NT_HistoryHint", defaults.historyHint);

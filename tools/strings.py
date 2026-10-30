@@ -10,8 +10,6 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 STRINGS = [
     ("pageDisplay", "Display", "Anzeige"),
-    ("pageLayout", "Layout", "Layout"),
-    ("layoutHint", "Move the notification lines and the big notifications in the middle of the screen (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). In the editor: drag a frame to move it, arrow keys for fine steps, mouse wheel to resize it, right-click to put it back.", "Verschiebt die Benachrichtigungszeilen und die großen Meldungen in der Mitte (Orte, auch von Dynamic Location Pop-ups; Quests; Skills und Stufe; Worte der Macht). Im Editor: Rahmen ziehen zum Verschieben, Pfeiltasten für feine Schritte, Mausrad für die Größe, Rechtsklick setzt zurück."),
     ("pageCompat", "Compatibility", "Kompatibilität"),
     ("pageHistory", "History", "Verlauf"),
     ("historyHint", "The last 100 notifications of this session, newest first.", "Die letzten 100 Benachrichtigungen dieser Sitzung, neueste oben."),
@@ -29,7 +27,7 @@ STRINGS = [
     ("enabled", "Replace Vanilla notifications", "Vanilla-Benachrichtigungen ersetzen"),
     ("enabledTip", "Off: the Vanilla HUD shows notifications again.", "Aus: Das Vanilla-HUD zeigt die Benachrichtigungen wieder selbst an."),
     ("dragButton", "Edit layout...", "Layout bearbeiten..."),
-    ("dragTip", "Closes this menu and shows a frame for everything that can be moved.", "Schließt dieses Menü und zeigt einen Rahmen für alles, was sich verschieben lässt."),
+    ("dragTip", "Closes this menu and shows a frame for the notification lines and one for each group of big notifications in the middle (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). Drag to move, arrow keys for fine steps, mouse wheel to resize, right-click to put back.", "Schließt dieses Menü und zeigt einen Rahmen für die Benachrichtigungszeilen und je einen für die großen Meldungen in der Mitte (Orte, auch von Dynamic Location Pop-ups; Quests; Skills und Stufe; Worte der Macht). Ziehen verschiebt, Pfeiltasten für feine Schritte, Mausrad für die Größe, Rechtsklick setzt zurück."),
     ("centerLocation", "Locations", "Orte"),
     ("centerQuest", "Quests", "Quests"),
     ("centerSkill", "Skills and level", "Skills und Stufe"),

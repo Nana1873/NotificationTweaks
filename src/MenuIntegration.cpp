@@ -171,11 +171,10 @@ namespace
 
         Commit(ImGuiMCP::Checkbox((t.enabled + "##enabled").c_str(), &s.enabled));
         Tooltip(t.enabledTip);
-        int align = static_cast<int>(s.align);
-        if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
-            s.align = static_cast<NT::Align>(align);
-            NT::SaveSettings();
+        if (ImGuiMCP::Button((t.dragButton + "##drag").c_str())) {
+            OpenPositioning();
         }
+        Tooltip(t.dragTip);
 
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
@@ -231,19 +230,6 @@ namespace
 
         ImGuiMCP::Spacing();
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
-    }
-
-    // Page "Layout": the editor for everything that can be moved.
-    void __stdcall RenderLayout()
-    {
-        const auto& t = NT::Translation::S();
-        ImGuiMCP::PushTextWrapPos(0.0F);
-        ImGuiMCP::TextDisabled("%s", t.layoutHint.c_str());
-        ImGuiMCP::PopTextWrapPos();
-        if (ImGuiMCP::Button((t.dragButton + "##drag").c_str())) {
-            OpenPositioning();
-        }
-        Tooltip(t.dragTip);
     }
 
     void __stdcall RenderCompat()
@@ -545,12 +531,11 @@ namespace NT::MenuIntegration
         const auto& t = NT::Translation::S();
         SKSEMenuFramework::SetSection(kSectionName);
         SKSEMenuFramework::AddSectionItem(t.pageDisplay, RenderDisplay);
-        SKSEMenuFramework::AddSectionItem(t.pageLayout, RenderLayout);
         SKSEMenuFramework::AddSectionItem(t.pageCompat, RenderCompat);
         SKSEMenuFramework::AddSectionItem(t.pageHistory, RenderHistory);
         g_positionWindow = SKSEMenuFramework::AddWindow(RenderPositionWindow, true);
         SKSEMenuFramework::AddEvent(OnMenuEvent, 0.0F);
-        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}', '{}', '{}'", kSectionName,
-            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageLayout, t.pageCompat, t.pageHistory);
+        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}', '{}'", kSectionName,
+            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageCompat, t.pageHistory);
     }
 }
