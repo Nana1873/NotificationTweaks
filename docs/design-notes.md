@@ -53,9 +53,15 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   narration lines carry actor names and are in no database). Without the
   lowercase check, load-time bursts merged wrongly in game ("Zuschauer-
   Vertreiber - Ziel hinzugefügt" + "... - Bereich hinzugefügt").
-- The engine already drops a `Debug.Notification` whose text repeats an
-  earlier one (four identical sends reached the hook once), so stacking
-  "(x2)" mainly matters for other senders.
+- The engine's ShowHUDMessage (52050/52933) drops a line sent with
+  `cancelIfAlreadyQueued` (Debug.Notification, most plugins) whose text
+  hash is among the last eight lines of the past 5 s. A toggle mod then
+  lost its newest state (ANQT: Enabled, Disabled, Enabled, the second
+  Disabled never arrived). On AE the plugin clears that table (ID 406616,
+  8 x {hash, ms}, same in every AE Address Library) after each line it
+  takes; SE keeps the filter (ID unverified). A repeat stacks only onto the
+  newest shown line: Enabled, Disabled, Enabled (a toggle mod) stays three
+  lines, otherwise the old line would read as the current state.
 - **BoS**: Bimbos of Skyrim 1.9.1.2 never splits text itself (every
   compiled script in the instance was searched); each thought is one
   `Debug.Notification("<font color=\"#FF00FF\">...</font>")`. The rule

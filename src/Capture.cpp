@@ -163,6 +163,23 @@ namespace
         return NT::Merge::Rule::kNone;
     }
 
+    // The engine's ShowHUDMessage (52050/52933) keeps the hashes of the last
+    // eight lines for 5 s and drops a repeat sent with cancelIfAlreadyQueued
+    // (Debug.Notification, most plugins). For a toggle mod that loses the
+    // newest state (Enabled, Disabled, Enabled: the second Disabled never
+    // arrives). Lines we show stack on their own, so the table is cleared
+    // after each line we take. AE only: the table is 8 x {hash, time ms} at
+    // ID 406616 in every AE Address Library (1.6.317 to 1.7.104); the SE ID
+    // is unverified, so SE keeps the engine filter.
+    void ClearEngineRepeatFilter()
+    {
+        if (!REL::Module::IsAE()) {
+            return;
+        }
+        static REL::Relocation<std::uint64_t*> table{ REL::ID(406616) };
+        std::fill_n(table.get(), 8, std::uint64_t{ 0 });
+    }
+
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
     // the request to show a notification line. Swallowing it here keeps it
     // out of the Vanilla HUDNotifications queue (and its one-at-a-time delay).
@@ -183,6 +200,7 @@ namespace
                     if (text && *text && !NT::Capture::Push(text)) {
                         return func(a_this, a_message);  // icons we cannot draw: Vanilla can
                     }
+                    ClearEngineRepeatFilter();
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
             }
@@ -219,6 +237,7 @@ namespace
                             RE::PlaySound(sound);
                         }
                         it = queue.erase(it);
+                        ClearEngineRepeatFilter();
                     } else {
                         ++it;
                     }
@@ -278,8 +297,13 @@ namespace NT::Capture
             }
         }
 
+        // Stack only onto the newest shown line: with another text in between
+        // (Enabled, Disabled, Enabled) the repeat is new information and gets
+        // its own line, or the oldest line would look like the current state.
         if (s.stackDuplicates) {
-            for (auto& entry : g_entries) {
+            const auto newest = std::ranges::find_if(g_entries.rbegin(), g_entries.rend(), [](const Entry& e) { return !e.hidden; });
+            if (newest != g_entries.rend()) {
+                auto& entry = *newest;
                 if (entry.raw == raw && entry.age < s.visibleTime) {
                     ++entry.count;
                     entry.age = std::min(entry.age, s.fadeIn);
