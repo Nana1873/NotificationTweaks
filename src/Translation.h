@@ -95,7 +95,7 @@ namespace NT::Translation
         std::string sample1 = "Notification Tweaks: sample line";
         std::string sample2 = "Drag with the left mouse button";
         std::string posWindowTitle = "Layout editor";
-        std::string posWindowHint = "Drag a frame to move it, mouse wheel resizes it, right-click puts it back. Saved right away.";
+        std::string posWindowHint = "Drag a frame to move it, arrow keys for fine steps (Shift: larger), mouse wheel resizes it, right-click puts it back.";
         std::string done = "Done";
         std::string testText = "This is a test notification.";
         std::string testManyText = "Message";

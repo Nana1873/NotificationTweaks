@@ -91,7 +91,7 @@ STRINGS = [
     ("sample1", "Notification Tweaks: sample line", "Notification Tweaks: Beispielzeile"),
     ("sample2", "Drag with the left mouse button", "Mit gedrückter linker Maustaste ziehen"),
     ("posWindowTitle", "Layout editor", "Layout-Editor"),
-    ("posWindowHint", "Drag a frame to move it, mouse wheel resizes it, right-click puts it back. Saved right away.", "Rahmen ziehen zum Verschieben, Mausrad für die Größe, Rechtsklick setzt zurück. Wird sofort gespeichert."),
+    ("posWindowHint", "Drag a frame to move it, arrow keys for fine steps (Shift: larger), mouse wheel resizes it, right-click puts it back.", "Rahmen ziehen zum Verschieben, Pfeiltasten für feine Schritte (Shift: größer), Mausrad für die Größe, Rechtsklick setzt zurück."),
     ("done", "Done", "Fertig"),
     ("testText", "This is a test notification.", "Das ist eine Testbenachrichtigung."),
     ("testManyText", "Message", "Meldung"),

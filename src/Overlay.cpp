@@ -22,7 +22,8 @@ namespace
     constexpr float           kCenterLabelPad = 4.0F;
     constexpr float           kCenterScaleStep = 0.05F;  // per wheel notch
     constexpr float           kFontSizeStep = 1.0F;      // px at 1080p per wheel notch
-    constexpr double          kWheelSaveDelay = 0.5;     // seconds after the last notch
+    constexpr double          kWheelSaveDelay = 0.5;     // seconds after the last notch or arrow key
+    constexpr float           kArrowStep = 1.0F;         // screen pixels per arrow key press (Shift: x10)
 
     std::atomic<bool> g_positioning{ false };
 
@@ -35,6 +36,8 @@ namespace
     };
     Target                 g_dragTarget = Target::kNone;
     std::size_t            g_dragGroup = 0;  // the center group held with kCenter
+    Target                 g_selected = Target::kLines;  // last clicked frame, moved by the arrow keys
+    std::size_t            g_selectedGroup = 0;
     ImVec2                 g_grabMouse{ 0.0F, 0.0F };
     ImVec2                 g_grabLines{ 0.0F, 0.0F };  // posX/posY at grab
     NT::CenterPlacement    g_grabPlace;                 // the group's placement at grab
@@ -436,6 +439,8 @@ namespace
             if (ImGuiMCP::IsMouseClicked(0)) {
                 g_dragTarget = hovered;
                 g_dragGroup = hoveredGroup;
+                g_selected = hovered;
+                g_selectedGroup = hoveredGroup;
                 g_grabMouse = mouse;
                 g_grabLines = { a_settings.posX, a_settings.posY };
                 g_grabPlace = place ? *place : NT::CenterPlacement{};
@@ -475,14 +480,35 @@ namespace
                 NT::SaveSettings();
             }
         }
+        // Arrow keys: fine moves of the selected frame, one pixel (Shift: ten).
+        if (g_dragTarget == Target::kNone) {
+            const float step = kArrowStep * (ImGuiMCP::IsKeyDown(ImGuiMCP::ImGuiMod_Shift) ? 10.0F : 1.0F);
+            const ImVec2 move{ (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_RightArrow) ? step : 0.0F) -
+                                   (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_LeftArrow) ? step : 0.0F),
+                (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_DownArrow) ? step : 0.0F) -
+                    (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_UpArrow) ? step : 0.0F) };
+            if (move.x != 0.0F || move.y != 0.0F) {
+                if (g_selected == Target::kLines) {
+                    a_settings.posX = std::clamp(a_settings.posX + move.x / a_screen.x, 0.0F, 1.0F);
+                    a_settings.posY = std::clamp(a_settings.posY + move.y / a_screen.y, 0.0F, 1.0F);
+                } else if (geometry.valid) {
+                    auto& place = a_settings.center[g_selectedGroup];
+                    place.x = std::clamp(place.x + move.x / geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
+                    place.y = std::clamp(place.y + move.y / geometry.pxPerUnitY, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
+                }
+                g_saveAt = ImGuiMCP::GetTime() + kWheelSaveDelay;
+            }
+        }
         if (g_saveAt > 0.0 && ImGuiMCP::GetTime() >= g_saveAt) {
             g_saveAt = 0.0;
             NT::SaveSettings();
         }
 
+        // Held or hovered (or, with nothing under the mouse, the selection
+        // the arrow keys move) is drawn bright.
         const auto active = [&](Target a_target, std::size_t a_group) {
-            const Target held = g_dragTarget != Target::kNone ? g_dragTarget : hovered;
-            const std::size_t group = g_dragTarget != Target::kNone ? g_dragGroup : hoveredGroup;
+            const Target held = g_dragTarget != Target::kNone ? g_dragTarget : hovered != Target::kNone ? hovered : g_selected;
+            const std::size_t group = g_dragTarget != Target::kNone ? g_dragGroup : hovered != Target::kNone ? hoveredGroup : g_selectedGroup;
             return held == a_target && (a_target != Target::kCenter || group == a_group);
         };
 

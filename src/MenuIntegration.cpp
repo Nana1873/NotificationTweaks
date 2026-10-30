@@ -121,8 +121,8 @@ namespace
         }
     }
 
-    // Small window of the layout editor: hint, fine sliders for the lines
-    // and Done.
+    // Small window of the layout editor: hint, the lines' alignment and Done
+    // (fine moves: arrow keys; sliders on the Layout page for a gamepad).
     void __stdcall RenderPositionWindow()
     {
         const auto& t = NT::Translation::S();
@@ -133,8 +133,6 @@ namespace
         if (ImGuiMCP::Begin((t.posWindowTitle + "###NTPosition").c_str(), &open,
                 ImGuiMCP::ImGuiWindowFlags_AlwaysAutoResize | ImGuiMCP::ImGuiWindowFlags_NoCollapse)) {
             ImGuiMCP::TextUnformatted(t.posWindowHint.c_str());
-            PercentSlider(t.posX, "##posx", s.posX, NT::Limits::kPos);
-            PercentSlider(t.posY, "##posy", s.posY, NT::Limits::kPos);
             int align = static_cast<int>(s.align);
             if (Combo(t.align, "##palign", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
                 s.align = static_cast<NT::Align>(align);
