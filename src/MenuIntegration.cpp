@@ -372,12 +372,15 @@ namespace
         }
         ImGuiMCP::BeginDisabled(a_disabled);
         ImGuiMCP::PushStyleVar(ImGuiMCP::ImGuiStyleVar_Alpha, ImGuiMCP::GetStyle()->Alpha * (a_dim ? kDefaultTimeAlpha : 1.0F));
+        // No vertical padding, like the eye (a SmallButton): a full-height
+        // frame is taller than the row and overlaps the next one.
+        ImGuiMCP::PushStyleVar(ImGuiMCP::ImGuiStyleVar_FramePadding, { ImGuiMCP::GetStyle()->FramePadding.x, 0.0F });
         ImGuiMCP::SetNextItemWidth(DurationSliderWidth());
         if (ImGuiMCP::SliderFloat(std::format("###time{}", a_id).c_str(), &value, NT::Limits::kDuration.min, NT::Limits::kDuration.max,
                 a_own ? "%.1f s" : defaultLabel.c_str(), kClamp)) {
             NT::Capture::SetDuration(a_key, value);
         }
-        ImGuiMCP::PopStyleVar();
+        ImGuiMCP::PopStyleVar(2);
         if (ImGuiMCP::IsItemDeactivatedAfterEdit()) {
             NT::Capture::SaveDurations();
         }
