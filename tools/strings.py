@@ -27,7 +27,7 @@ STRINGS = [
     ("enabled", "Replace Vanilla notifications", "Vanilla-Benachrichtigungen ersetzen"),
     ("enabledTip", "Off: the Vanilla HUD shows notifications again.", "Aus: Das Vanilla-HUD zeigt die Benachrichtigungen wieder selbst an."),
     ("dragButton", "Edit layout...", "Layout bearbeiten..."),
-    ("dragTip", "Closes this menu and shows a frame for the notification lines and one for each group of big notifications in the middle (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). Drag to move, arrow keys for fine steps, mouse wheel to resize, right-click to put back.", "Schließt dieses Menü und zeigt einen Rahmen für die Benachrichtigungszeilen und je einen für die großen Meldungen in der Mitte (Orte, auch von Dynamic Location Pop-ups; Quests; Skills und Stufe; Worte der Macht). Ziehen verschiebt, Pfeiltasten für feine Schritte, Mausrad für die Größe, Rechtsklick setzt zurück."),
+    ("dragTip", "Move and resize the notification lines and the big messages in the middle of the screen.", "Benachrichtigungszeilen und die großen Meldungen in der Mitte verschieben und skalieren."),
     ("centerLocation", "Locations", "Orte"),
     ("centerQuest", "Quests", "Quests"),
     ("centerSkill", "Skills and level", "Skills und Stufe"),

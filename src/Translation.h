@@ -31,7 +31,7 @@ namespace NT::Translation
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";
         std::string dragButton = "Edit layout...";
-        std::string dragTip = "Closes this menu and shows a frame for the notification lines and one for each group of big notifications in the middle (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). Drag to move, arrow keys for fine steps, mouse wheel to resize, right-click to put back.";
+        std::string dragTip = "Move and resize the notification lines and the big messages in the middle of the screen.";
         std::string centerLocation = "Locations";
         std::string centerQuest = "Quests";
         std::string centerSkill = "Skills and level";
