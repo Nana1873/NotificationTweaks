@@ -348,6 +348,81 @@ namespace
         return drawn;
     }
 
+    // Own display time of a history line, at the right edge of its row.
+    // Shown while the row is hovered, while dragged and whenever the line
+    // has its own time; right-click goes back to the general setting.
+    std::uint64_t g_durationDragged = 0;  // history id of the slider being dragged
+
+    float DurationSliderWidth()
+    {
+        return ImGuiMCP::GetFontSize() * 5.0F;
+    }
+
+    void DurationSlider(const std::string& a_key, std::optional<float> a_own, bool a_disabled, std::uint64_t a_id)
+    {
+        const auto& t = NT::Translation::S();
+        float       value = a_own.value_or(NT::Config().duration);
+        // Without a "%" ImGui shows the format as plain text; escape any "%"
+        // a translation may contain.
+        std::string defaultLabel = t.historyTimeDefault;
+        for (std::size_t pos = 0; (pos = defaultLabel.find('%', pos)) != std::string::npos; pos += 2) {
+            defaultLabel.insert(pos, 1, '%');
+        }
+        ImGuiMCP::BeginDisabled(a_disabled);
+        ImGuiMCP::SetNextItemWidth(DurationSliderWidth());
+        if (ImGuiMCP::SliderFloat(std::format("###time{}", a_id).c_str(), &value, NT::Limits::kDuration.min, NT::Limits::kDuration.max,
+                a_own ? "%.1f s" : defaultLabel.c_str(), kClamp)) {
+            NT::Capture::SetDuration(a_key, value);
+        }
+        if (ImGuiMCP::IsItemActive()) {
+            g_durationDragged = a_id;
+        } else if (g_durationDragged == a_id) {
+            g_durationDragged = 0;
+        }
+        if (ImGuiMCP::IsItemDeactivatedAfterEdit()) {
+            NT::Capture::SaveDurations();
+        }
+        if (a_own && ImGuiMCP::IsItemClicked(ImGuiMCP::ImGuiMouseButton_Right)) {
+            NT::Capture::SetDuration(a_key, std::nullopt);
+            NT::Capture::SaveDurations();
+        }
+        ImGuiMCP::EndDisabled();
+        Tooltip(t.historyTime);
+    }
+
+    // One history row without its slider: eye (or a spacer for a line that
+    // cannot be hidden), time, icon glyphs, text.
+    void RenderHistoryRow(const NT::Capture::HistoryEntry& a_entry, const std::string& a_key, bool a_hidden)
+    {
+        const auto& t = NT::Translation::S();
+        if (a_key.empty()) {
+            EyeSpacer(a_entry.id);
+        } else {
+            HideToggle(a_key, a_hidden, a_entry.id);
+        }
+        ImGuiMCP::SameLine();
+        ImGuiMCP::TextDisabled("%s", LocalTime(a_entry.time).c_str());
+        ImGuiMCP::SameLine();
+
+        const bool noText = a_entry.text.empty();
+        const auto color = a_hidden    ? *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled) :
+                           a_entry.rgb ? NT::Overlay::RgbColor(*a_entry.rgb) :
+                                         *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_Text);
+        const int  icons = HistoryIcons(a_entry, color, !noText);
+        if (noText) {
+            if (icons == 0 && !a_entry.icons.empty()) {
+                ImGuiMCP::TextDisabled("%s", t.historyIconOnly.c_str());  // font missing or off
+            } else if (icons == 0) {
+                ImGuiMCP::TextUnformatted("");  // nothing visible: end the row after the time
+            }
+            return;
+        }
+        const auto line = a_entry.count > 1 ? std::format("{} (x{})", a_entry.text, a_entry.count) : a_entry.text;
+        ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, color);
+        ImGuiMCP::TextWrapped("%s", line.c_str());
+        ImGuiMCP::PopStyleColor();
+    }
+
     // Page "History": the session's notifications, newest first, in their
     // own color; merged halves appear as the one line they became. Hidden
     // lines are grey with a closed eye.
@@ -357,6 +432,7 @@ namespace
         static char filter[128]{};
 
         const auto hidden = NT::Capture::HiddenKeys();
+        const auto durations = NT::Capture::Durations();
 
         ImGuiMCP::TextDisabled("%s", t.historyHint.c_str());
         ImGuiMCP::InputTextWithHint("##historyfilter", t.historyFilter.c_str(), filter, sizeof(filter));
@@ -386,42 +462,34 @@ namespace
             bool                                  any = false;
             std::deque<NT::Capture::HistoryEntry> history;
             NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) { history = a_history; });
+            // Text wraps before the slider column at the right edge.
+            const float sliderX = ImGuiMCP::GetWindowContentRegionMax().x - DurationSliderWidth();
+            ImGuiMCP::PushTextWrapPos(sliderX - ImGuiMCP::GetStyle()->ItemSpacing.x);
             for (auto it = history.rbegin(); it != history.rend(); ++it) {
                 if (!needle.empty() && NT::Text::Lower(it->text).find(needle) == std::string::npos) {
                     continue;
                 }
                 any = true;
-                // A line with neither text nor icons cannot be hidden; an
-                // invisible eye keeps the columns aligned.
-                const bool noText = it->text.empty();
                 const auto key = NT::Markup::LineHideKey(it->text, it->icons);
                 const bool isHidden = !key.empty() && hidden.contains(key);
+                const auto rowStart = ImGuiMCP::GetCursorPos();
+                const auto rowStartScreen = ImGuiMCP::GetCursorScreenPos();
+                RenderHistoryRow(*it, key, isHidden);
                 if (key.empty()) {
-                    EyeSpacer(it->id);
-                } else {
-                    HideToggle(key, isHidden, it->id);
-                }
-                ImGuiMCP::SameLine();
-                ImGuiMCP::TextDisabled("%s", LocalTime(it->time).c_str());
-                ImGuiMCP::SameLine();
-
-                const auto color = isHidden ? *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_TextDisabled) :
-                                   it->rgb  ? NT::Overlay::RgbColor(*it->rgb) :
-                                              *ImGuiMCP::GetStyleColorVec4(ImGuiMCP::ImGuiCol_Text);
-                const int  icons = HistoryIcons(*it, color, !noText);
-                if (noText) {
-                    if (icons == 0 && !it->icons.empty()) {
-                        ImGuiMCP::TextDisabled("%s", t.historyIconOnly.c_str());  // font missing or off
-                    } else if (icons == 0) {
-                        ImGuiMCP::TextUnformatted("");  // nothing visible: end the row after the time
-                    }
                     continue;
                 }
-                const auto line = it->count > 1 ? std::format("{} (x{})", it->text, it->count) : it->text;
-                ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_Text, color);
-                ImGuiMCP::TextWrapped("%s", line.c_str());
-                ImGuiMCP::PopStyleColor();
+                // The slider goes back up onto the row's first line.
+                const auto rowEnd = ImGuiMCP::GetCursorPos();
+                const auto own = durations.contains(key) ? std::optional{ durations.at(key) } : std::nullopt;
+                const bool hovered = ImGuiMCP::IsMouseHoveringRect(rowStartScreen,
+                    { rowStartScreen.x + ImGuiMCP::GetWindowContentRegionMax().x, rowStartScreen.y + (rowEnd.y - rowStart.y) });
+                if (own || hovered || g_durationDragged == it->id) {
+                    ImGuiMCP::SetCursorPos({ sliderX, rowStart.y });
+                    DurationSlider(key, own, isHidden || !NT::CaptureEnabled(), it->id);
+                    ImGuiMCP::SetCursorPos(rowEnd);
+                }
             }
+            ImGuiMCP::PopTextWrapPos();
             if (!any) {
                 ImGuiMCP::TextDisabled("%s", t.historyEmpty.c_str());
             }

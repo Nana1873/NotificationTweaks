@@ -134,6 +134,12 @@ namespace
         return lines;
     }
 
+    // Fully visible time of a line: its own (History slider) or the general one.
+    float Duration(const NT::Capture::Entry& a_entry, const NT::Settings& a_settings)
+    {
+        return a_entry.duration.value_or(a_settings.duration);
+    }
+
     float Alpha(const NT::Capture::Entry& a_entry, const NT::Settings& a_settings)
     {
         if (!a_entry.started) {
@@ -143,7 +149,7 @@ namespace
         if (a_settings.fadeIn > 0.0F && age < a_settings.fadeIn) {
             return age / a_settings.fadeIn;
         }
-        const float fadeStart = a_settings.fadeIn + a_settings.duration;
+        const float fadeStart = a_settings.fadeIn + Duration(a_entry, a_settings);
         if (age <= fadeStart) {
             return 1.0F;
         }
@@ -189,7 +195,6 @@ namespace
     {
         std::vector<NT::Capture::Entry> visible;
         NT::Capture::Visit([&](std::deque<NT::Capture::Entry>& a_entries) {
-            const float lifetime = a_settings.fadeIn + a_settings.duration + a_settings.fadeOut;
             const NT::Capture::Entry* previous = nullptr;
             for (auto& entry : a_entries) {
                 if (entry.hidden) {
@@ -217,11 +222,13 @@ namespace
                     continue;
                 }
                 if (++shown > a_settings.maxVisible) {
-                    it->age = std::max(it->age, a_settings.fadeIn + a_settings.duration);
+                    it->age = std::max(it->age, a_settings.fadeIn + Duration(*it, a_settings));
                 }
             }
 
-            std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) { return a_entry.started && a_entry.age >= lifetime; });
+            std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) {
+                return a_entry.started && a_entry.age >= a_settings.fadeIn + Duration(a_entry, a_settings) + a_settings.fadeOut;
+            });
             for (const auto& entry : a_entries) {
                 if (entry.started && !entry.hidden) {
                     visible.push_back(entry);

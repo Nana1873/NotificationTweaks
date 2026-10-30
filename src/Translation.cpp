@@ -161,6 +161,8 @@ namespace NT::Translation
         g_strings.historyUnhide = Translate("$NT_HistoryUnhide", defaults.historyUnhide);
         g_strings.historyHideOff = Translate("$NT_HistoryHideOff", defaults.historyHideOff);
         g_strings.historyShowAll = Translate("$NT_HistoryShowAll", defaults.historyShowAll);
+        g_strings.historyTime = Translate("$NT_HistoryTime", defaults.historyTime);
+        g_strings.historyTimeDefault = Translate("$NT_HistoryTimeDefault", defaults.historyTimeDefault);
         g_strings.headAdvanced = Translate("$NT_HeadAdvanced", defaults.headAdvanced);
         g_strings.enabled = Translate("$NT_Enabled", defaults.enabled);
         g_strings.enabledTip = Translate("$NT_EnabledTip", defaults.enabledTip);

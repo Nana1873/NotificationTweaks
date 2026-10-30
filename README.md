@@ -27,7 +27,7 @@ plugins put in the top left corner) and draws them itself through
   right before a loading screen show up after it.
 - Compatibility page: merges messages that some mods split into two
   notifications (YPS and BoS thoughts, optional generic rule).
-- Identical repeats stack as "(x2)". `$Key` notifications are translated
+- A message repeated right after itself stacks as "(x2)". `$Key` notifications are translated
   like Vanilla does. Quest, skill and level messages stay Vanilla.
 - Icon fonts (e.g. Oblivion Interaction Icons' `$Iconographia`): the
   plugin reads the font library `Interface/fontconfig.txt` maps the face

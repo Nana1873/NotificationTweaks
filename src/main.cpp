@@ -57,6 +57,7 @@ namespace
         NT::Translation::Import("NotificationTweaks");
         NT::Translation::LoadStrings();
         NT::Capture::LoadHidden();
+        NT::Capture::LoadDurations();
         if (NT::Config().drawIconFonts) {
             NT::IconFont::Preload();  // during the loading screen, not mid-game
         }

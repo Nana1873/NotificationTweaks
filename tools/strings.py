@@ -20,6 +20,8 @@ STRINGS = [
     ("historyUnhide", "Hidden in the HUD. Click to show it again.", "Im HUD ausgeblendet. Klicken, um sie wieder anzuzeigen."),
     ("historyHideOff", "Hiding works while \"Replace Vanilla notifications\" is on.", "Ausblenden wirkt, solange \"Vanilla-Benachrichtigungen ersetzen\" an ist."),
     ("historyShowAll", "Show all hidden again", "Alle ausgeblendeten wieder anzeigen"),
+    ("historyTime", "Display time for this message (numbers match any number). Right-click: back to the general setting.", "Anzeigedauer für diese Meldung (Zahlen passen auf jede Zahl). Rechtsklick: zurück zur allgemeinen Einstellung."),
+    ("historyTimeDefault", "Default", "Standard"),
     ("headAdvanced", "Advanced", "Erweitert"),
     ("enabled", "Replace Vanilla notifications", "Vanilla-Benachrichtigungen ersetzen"),
     ("enabledTip", "Off: the Vanilla HUD shows notifications again.", "Aus: Das Vanilla-HUD zeigt die Benachrichtigungen wieder selbst an."),

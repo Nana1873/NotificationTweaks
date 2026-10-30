@@ -53,15 +53,6 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   narration lines carry actor names and are in no database). Without the
   lowercase check, load-time bursts merged wrongly in game ("Zuschauer-
   Vertreiber - Ziel hinzugefügt" + "... - Bereich hinzugefügt").
-- The engine's ShowHUDMessage (52050/52933) drops a line sent with
-  `cancelIfAlreadyQueued` (Debug.Notification, most plugins) whose text
-  hash is among the last eight lines of the past 5 s. A toggle mod then
-  lost its newest state (ANQT: Enabled, Disabled, Enabled, the second
-  Disabled never arrived). On AE the plugin clears that table (ID 406616,
-  8 x {hash, ms}, same in every AE Address Library) after each line it
-  takes; SE keeps the filter (ID unverified). A repeat stacks only onto the
-  newest shown line: Enabled, Disabled, Enabled (a toggle mod) stays three
-  lines, otherwise the old line would read as the current state.
 - **BoS**: Bimbos of Skyrim 1.9.1.2 never splits text itself (every
   compiled script in the instance was searched); each thought is one
   `Debug.Notification("<font color=\"#FF00FF\">...</font>")`. The rule
@@ -70,6 +61,22 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   "split BoS thoughts" so far were YPS thoughts (example: thought 01680,
   "Ich brauch eine Begleitung, die meine Sachen | trägt, ...").
 - **Generic** (off by default): no sentence end + lowercase continuation.
+- **Repeats** (not a merge rule): a repeat stacks as "(x2)" only onto the
+  newest shown line, so Enabled, Disabled, Enabled stays three lines
+  instead of the oldest line reading as the current state. The engine's
+  ShowHUDMessage (SE 52050 / AE 52933) also drops a line sent with
+  `cancelIfAlreadyQueued` (Debug.Notification, most plugins) whose text
+  hash is among the last eight of the past 5 s; Auto Nearby Quest Tracker
+  lost its newest state that way. On AE 1.6.317 to 1.7.104 the plugin
+  clears that table (ID 406616, 8 x {u32 hash, u32 ms}, checked at startup
+  against the guard right behind it, ID 406624) after each line it takes,
+  unless stacking is off. SE, VR and newer runtimes keep the filter.
+  Trade-offs: interleaved repeats (A, B, A, B) now each get a line, and a
+  script sending A, B, A within one frame still loses the second A (the
+  table is cleared on the main thread after the sender recorded it; a hook
+  on ShowHUDMessage forcing `cancelIfAlreadyQueued` off would close that).
+  Shown and hidden lines stack separately, so a hidden spammer stays one
+  entry.
 
 ## Overlay (src/Overlay.cpp)
 
@@ -164,6 +171,19 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   newest line.
 - With "Replace Vanilla notifications" off the eye is disabled; the Vanilla
   HUD shows everything then.
+
+## Own display time (1.2.0)
+
+- A slider at the right edge of a History row sets the fully visible time
+  for every line with the same hide key (`[Durations]`: `Count`, `LineN`
+  escaped like `[Hidden]`, `TimeN` in seconds, range of the general
+  Duration). Fade in and fade out stay general.
+- It shows while the row is hovered, while dragged and whenever the line
+  has its own time; right-click goes back to the general setting. The
+  value applies to live lines at once; the file is written on release.
+- `Entry::duration` is resolved when a line arrives or merges and when a
+  time changes; the overlay's alpha, lifetime and MaxVisible fade and the
+  stacking window use it instead of the general Duration.
 
 ## Testing notes
 

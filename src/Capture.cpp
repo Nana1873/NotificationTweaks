@@ -11,12 +11,23 @@ namespace
     std::deque<NT::Capture::Entry>        g_entries;
     std::deque<NT::Capture::HistoryEntry> g_history;
     std::uint64_t                         g_nextID = 1;
-    std::set<std::string>                 g_hidden;  // hide keys, see NT::Markup::LineHideKey
+    std::set<std::string>                 g_hidden;     // hide keys, see NT::Markup::LineHideKey
+    std::map<std::string, float>          g_durations;  // own display time per hide key
 
     // Caller holds g_lock.
     bool IsHidden(std::string_view a_raw)
     {
         return !g_hidden.empty() && g_hidden.contains(NT::Markup::LineHideKey(a_raw));
+    }
+
+    // Caller holds g_lock.
+    std::optional<float> DurationFor(std::string_view a_raw)
+    {
+        if (g_durations.empty()) {
+            return std::nullopt;
+        }
+        const auto it = g_durations.find(NT::Markup::LineHideKey(a_raw));
+        return it != g_durations.end() ? std::optional{ it->second } : std::nullopt;
     }
 
     // Caller holds g_lock. A line that stops being hidden starts over, so it
@@ -163,21 +174,54 @@ namespace
         return NT::Merge::Rule::kNone;
     }
 
-    // The engine's ShowHUDMessage (52050/52933) keeps the hashes of the last
-    // eight lines for 5 s and drops a repeat sent with cancelIfAlreadyQueued
-    // (Debug.Notification, most plugins). For a toggle mod that loses the
-    // newest state (Enabled, Disabled, Enabled: the second Disabled never
-    // arrives). Lines we show stack on their own, so the table is cleared
-    // after each line we take. AE only: the table is 8 x {hash, time ms} at
-    // ID 406616 in every AE Address Library (1.6.317 to 1.7.104); the SE ID
-    // is unverified, so SE keeps the engine filter.
-    void ClearEngineRepeatFilter()
+    // The engine's repeat filter in ShowHUDMessage (SE 52050 / AE 52933),
+    // see design-notes "Repeats". We stack repeats ourselves, so it is
+    // cleared after each line we take. Only on the AE versions whose layout
+    // was checked (Install); the SE ID of the table is unverified.
+    struct RecentMessage
     {
-        if (!REL::Module::IsAE()) {
+        std::uint32_t hash;
+        std::uint32_t timeMs;
+    };
+    constexpr std::size_t kRecentMessageSlots = 8;
+    constexpr std::uint64_t kRecentMessagesAE = 406616;
+    constexpr std::uint64_t kRecentMessagesGuardAE = 406624;  // static-init guard right behind the table
+    constexpr REL::Version  kRepeatFilterFirst{ 1, 6, 317, 0 };
+    constexpr REL::Version  kRepeatFilterLast{ 1, 7, 104, 0 };
+
+    RecentMessage* g_recentMessages = nullptr;  // set by Install when the layout matches
+
+    void FindEngineRepeatFilter()
+    {
+        const auto version = REL::Module::get().version();
+        if (!REL::Module::IsAE() || version < kRepeatFilterFirst || version > kRepeatFilterLast) {
+            logs::info("Engine repeat filter left alone on {}", version.string());
             return;
         }
-        static REL::Relocation<std::uint64_t*> table{ REL::ID(406616) };
-        std::fill_n(table.get(), 8, std::uint64_t{ 0 });
+        const auto table = REL::ID(kRecentMessagesAE).address();
+        if (REL::ID(kRecentMessagesGuardAE).address() - table != kRecentMessageSlots * sizeof(RecentMessage)) {
+            logs::warn("Engine repeat filter: unexpected layout, left alone");
+            return;
+        }
+        g_recentMessages = reinterpret_cast<RecentMessage*>(table);
+    }
+
+    void ClearEngineRepeatFilter()
+    {
+        if (g_recentMessages && NT::CaptureConfig().stackDuplicates) {
+            std::fill_n(g_recentMessages, kRecentMessageSlots, RecentMessage{});
+        }
+    }
+
+    // Both hooks: hand the line to the overlay; when it is taken, also clear
+    // the engine's repeat filter. False: Vanilla shows it.
+    bool Take(const char* a_text)
+    {
+        if (!NT::Capture::Push(a_text)) {
+            return false;
+        }
+        ClearEngineRepeatFilter();
+        return true;
     }
 
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
@@ -197,10 +241,9 @@ namespace
                         }
                         return func(a_this, a_message);
                     }
-                    if (text && *text && !NT::Capture::Push(text)) {
+                    if (text && *text && !Take(text)) {
                         return func(a_this, a_message);  // icons we cannot draw: Vanilla can
                     }
-                    ClearEngineRepeatFilter();
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
             }
@@ -229,7 +272,7 @@ namespace
                             logs::info("Plain notification taken from the HUDNotifications queue (direct sender)");
                         }
                         if (const char* text = it->text.c_str(); text && *text) {
-                            NT::Capture::Push(text);
+                            Take(text);
                         }
                         // Vanilla plays a queued entry's sound when it shows the
                         // line; the entry is gone after this, so play it here.
@@ -237,7 +280,6 @@ namespace
                             RE::PlaySound(sound);
                         }
                         it = queue.erase(it);
-                        ClearEngineRepeatFilter();
                     } else {
                         ++it;
                     }
@@ -258,6 +300,8 @@ namespace NT::Capture
 
         REL::Relocation<std::uintptr_t> notifications{ RE::VTABLE_HUDNotifications[0] };
         UpdateHook::func = notifications.write_vfunc(0x1, UpdateHook::thunk);
+
+        FindEngineRepeatFilter();
 
         logs::info("Hooked HUDMenu::ProcessMessage and HUDNotifications::Update");
     }
@@ -288,6 +332,7 @@ namespace NT::Capture
                     last.runs = Markup::Parse(last.raw);
                     last.mergedBy = rule;
                     UpdateHidden(last, IsHidden(last.raw));
+                    last.duration = DurationFor(last.raw);
                     if (auto* history = FindHistory(last.id)) {
                         SetHistoryText(*history, last.raw);
                     }
@@ -297,14 +342,19 @@ namespace NT::Capture
             }
         }
 
-        // Stack only onto the newest shown line: with another text in between
-        // (Enabled, Disabled, Enabled) the repeat is new information and gets
-        // its own line, or the oldest line would look like the current state.
+        // Stack only onto the newest line: a repeat after another text is a
+        // new state (Enabled, Disabled, Enabled) and gets its own line, or the
+        // oldest line would look like the current state. Shown and hidden
+        // lines are looked at separately, so hidden lines in between do not
+        // break a run and a hidden spammer still stacks instead of flooding.
         if (s.stackDuplicates) {
-            const auto newest = std::ranges::find_if(g_entries.rbegin(), g_entries.rend(), [](const Entry& e) { return !e.hidden; });
+            const bool hidden = IsHidden(raw);
+            const auto newest = std::ranges::find_if(g_entries.rbegin(), g_entries.rend(),
+                [&](const NT::Capture::Entry& a_entry) { return a_entry.hidden == hidden; });
             if (newest != g_entries.rend()) {
                 auto& entry = *newest;
-                if (entry.raw == raw && entry.age < s.visibleTime) {
+                const float visibleTime = entry.duration ? s.fadeIn + *entry.duration : s.visibleTime;
+                if (entry.raw == raw && entry.age < visibleTime) {
                     ++entry.count;
                     entry.age = std::min(entry.age, s.fadeIn);
                     if (auto* history = FindHistory(entry.id)) {
@@ -322,6 +372,7 @@ namespace NT::Capture
         entry.runs = Markup::Parse(entry.raw);
         entry.arrival = now;
         entry.hidden = IsHidden(entry.raw);
+        entry.duration = DurationFor(entry.raw);
         logs::debug("Notification #{}: {}", entry.id, Markup::ToUtf8(entry.raw));
         AddHistory(entry.id, entry.raw);
         g_entries.push_back(std::move(entry));
@@ -401,6 +452,41 @@ namespace NT::Capture
         }
         NT::WriteHiddenKeys({});
         logs::info("All hidden lines shown again");
+    }
+
+    void LoadDurations()
+    {
+        auto             durations = NT::ReadDurations();
+        std::scoped_lock lock{ g_lock };
+        g_durations = std::move(durations);
+    }
+
+    std::map<std::string, float> Durations()
+    {
+        std::scoped_lock lock{ g_lock };
+        return g_durations;
+    }
+
+    void SetDuration(const std::string& a_key, std::optional<float> a_seconds)
+    {
+        if (a_key.empty()) {
+            return;
+        }
+        std::scoped_lock lock{ g_lock };
+        if (a_seconds) {
+            g_durations[a_key] = *a_seconds;
+        } else {
+            g_durations.erase(a_key);
+        }
+        for (auto& entry : g_entries) {
+            entry.duration = DurationFor(entry.raw);
+        }
+    }
+
+    void SaveDurations()
+    {
+        // File I/O outside the lock, so Push on the game thread never waits on it.
+        NT::WriteDurations(Durations());
     }
 
     void SendTest(std::vector<std::string> a_texts)

@@ -51,6 +51,47 @@ namespace
         return buf;
     }
 
+    // A key list section ([Hidden], [Durations]): Count, then LineN with the
+    // key and, when given, TimeN with its value.
+    struct KeyLine
+    {
+        std::string                key;
+        std::optional<std::string> time;
+    };
+
+    void WriteKeySection(const char* a_section, const std::vector<KeyLine>& a_lines)
+    {
+        const auto path = IniPath();
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+
+        // One section write (one file rewrite) instead of one per key; it
+        // also replaces the old section as a whole, so Count and the lines
+        // never get out of step.
+        std::string lines;
+        int         count = 0;
+        for (const auto& line : a_lines) {
+            const auto value = NT::Text::PercentEscape(line.key);
+            if (value.size() > kMaxHiddenValue) {
+                logs::warn("[{}] line too long to save ({} bytes), kept for this session only", a_section, value.size());
+                continue;
+            }
+            // Quoted: the profile API strips outer quotes on read, so leading
+            // or trailing spaces and quotes inside the text survive.
+            lines += std::format("Line{}=\"{}\"", ++count, value);
+            lines += '\0';
+            if (line.time) {
+                lines += std::format("Time{}={}", count, *line.time);
+                lines += '\0';
+            }
+        }
+        auto section = std::format("Count={}", count);
+        section += '\0';
+        section += lines;
+        section += '\0';
+        WritePrivateProfileSectionA(a_section, section.c_str(), path.c_str());
+    }
+
     float ReadFloat(const char* a_section, const char* a_key, float a_default, NT::Range<float> a_range, const std::string& a_path)
     {
         const auto text = ReadString(a_section, a_key, "", a_path);
@@ -238,30 +279,35 @@ namespace NT
 
     void WriteHiddenKeys(const std::vector<std::string>& a_keys)
     {
-        const auto path = IniPath();
-        std::error_code ec;
-        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
-
-        // One section write (one file rewrite) instead of one per key; it
-        // also replaces the old section as a whole, so Count and the lines
-        // never get out of step.
-        std::string lines;
-        int         count = 0;
+        std::vector<KeyLine> lines;
         for (const auto& key : a_keys) {
-            const auto value = NT::Text::PercentEscape(key);
-            if (value.size() > kMaxHiddenValue) {
-                logs::warn("Hidden line too long to save ({} bytes), kept for this session only", value.size());
-                continue;
-            }
-            // Quoted: the profile API strips outer quotes on read, so leading
-            // or trailing spaces and quotes inside the text survive.
-            lines += std::format("Line{}=\"{}\"", ++count, value);
-            lines += '\0';
+            lines.push_back({ key, std::nullopt });
         }
-        auto section = std::format("Count={}", count);
-        section += '\0';
-        section += lines;
-        section += '\0';
-        WritePrivateProfileSectionA("Hidden", section.c_str(), path.c_str());
+        WriteKeySection("Hidden", lines);
+    }
+
+    std::map<std::string, float> ReadDurations()
+    {
+        const auto                   path = IniPath();
+        const int                    count = ReadInt("Durations", "Count", 0, { 0, 10000 }, path);
+        std::map<std::string, float> durations;
+        for (int i = 1; i <= count; ++i) {
+            auto key = NT::Text::PercentUnescape(ReadString("Durations", std::format("Line{}", i).c_str(), "", path));
+            const float seconds = ReadFloat("Durations", std::format("Time{}", i).c_str(), NT::Settings{}.duration, Limits::kDuration, path);
+            if (!key.empty()) {
+                durations[std::move(key)] = seconds;
+            }
+        }
+        logs::info("{} own display time(s) loaded", durations.size());
+        return durations;
+    }
+
+    void WriteDurations(const std::map<std::string, float>& a_durations)
+    {
+        std::vector<KeyLine> lines;
+        for (const auto& [key, seconds] : a_durations) {
+            lines.push_back({ key, std::format("{:.1f}", seconds) });
+        }
+        WriteKeySection("Durations", lines);
     }
 }

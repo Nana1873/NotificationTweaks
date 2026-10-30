@@ -19,6 +19,7 @@ namespace NT::Capture
         bool                                  started = false;  // false while waiting in queue mode
         bool                                  hidden = false;   // matches a hide key: history only, not drawn
         float                                 age = 0.0F;       // seconds since it started showing
+        std::optional<float>                  duration;         // own display time (History slider), else Settings::duration
     };
 
     // One line of the session history (menu page "History"), kept in memory
@@ -68,6 +69,14 @@ namespace NT::Capture
     std::set<std::string> HiddenKeys();
     void                  SetHidden(const std::string& a_key, bool a_hidden);  // saves; applies to live lines too
     void                  ClearHidden();
+
+    // Own display time per message, keyed like hiding. SetDuration applies
+    // to live lines at once (nullopt: back to the general setting) without
+    // writing the file; SaveDurations writes it (on slider release).
+    void                         LoadDurations();  // startup, after LoadSettings
+    std::map<std::string, float> Durations();
+    void                         SetDuration(const std::string& a_key, std::optional<float> a_seconds);
+    void                         SaveDurations();
 
     // Sends a notification through the regular game path (SKSE task), so
     // menu tests go through the same hook as every other sender.

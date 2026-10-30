@@ -128,4 +128,8 @@ namespace NT
     // the HUD. Capture owns the live set and calls these.
     std::vector<std::string> ReadHiddenKeys();
     void                     WriteHiddenKeys(const std::vector<std::string>& a_keys);
+
+    // [Durations]: own display time per hide key, set on the History page.
+    std::map<std::string, float> ReadDurations();
+    void                         WriteDurations(const std::map<std::string, float>& a_durations);
 }
