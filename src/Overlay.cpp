@@ -590,7 +590,8 @@ namespace
         }
         // Arrow keys: fine moves of the selected frame, one pixel (Shift: ten).
         if (g_dragTarget == Target::kNone) {
-            const bool  shift = ImGuiMCP::IsKeyDown(ImGuiMCP::ImGuiKey_LeftShift) || ImGuiMCP::IsKeyDown(ImGuiMCP::ImGuiKey_RightShift);
+            // SMF passes the arrows to ImGui but not Shift, so ask Windows.
+            const bool  shift = (::GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
             const float step = shift ? kArrowStepShift : kArrowStep;
             const ImVec2 move{ (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_RightArrow) ? step : 0.0F) -
                                    (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_LeftArrow) ? step : 0.0F),
