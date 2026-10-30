@@ -26,8 +26,8 @@ namespace
         kLines,
         kCenter
     };
-    DragTarget       g_dragTarget = DragTarget::kNone;
-    std::atomic<int> g_centerSelection{ 0 };  // see Overlay::SetCenterSelection
+    DragTarget  g_dragTarget = DragTarget::kNone;
+    std::size_t g_dragGroup = 0;  // the center group held with kCenter
 
     struct Piece
     {
@@ -413,65 +413,64 @@ namespace
         return { { cx - halfW, cy - halfH }, { cx + halfW, cy + halfH } };
     }
 
-    // Positioning mode: a labelled frame per center group (where its title
-    // line shows). The selected group, or all of them together, follows a
-    // left-button drag; saved on release.
+    // Positioning mode: a labelled box per center group (where its title
+    // line shows), like a layout editor. All start on the Vanilla spot,
+    // stacked; a click takes the topmost box under the mouse, so dragging
+    // one away brings the next to the top. Saved on release.
     void HandleCenterDrag(ImGuiMCP::ImDrawList* a_list, NT::Settings& a_settings)
     {
         const auto geometry = NT::CenterNotifications::GetGeometry();
         if (!geometry.valid) {
             return;
         }
-        const auto&       t = NT::Translation::S();
+        const auto&        t = NT::Translation::S();
         const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
-        const int         selection = g_centerSelection.load();
-        const auto        selected = [&](std::size_t a_group) { return selection == 0 || selection == static_cast<int>(a_group) + 1; };
-        const auto        mouse = ImGuiMCP::GetMousePos();
-        const bool        overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
+        const auto         mouse = ImGuiMCP::GetMousePos();
+        const bool         overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
 
-        bool hovered = false;
+        // Drawn last = on top: locations, the group most players move.
+        constexpr std::array<std::size_t, NT::kCenterGroups> kDrawOrder = { 3, 2, 1, 0 };
+        std::array<std::pair<ImVec2, ImVec2>, NT::kCenterGroups> boxes;
         for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
-            const auto [min, max] = CenterFrame(geometry, a_settings.center[i]);
-            if (selected(i) && mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) {
-                hovered = true;
+            boxes[i] = CenterFrame(geometry, a_settings.center[i]);
+        }
+        std::optional<std::size_t> hovered;
+        if (!overWindow) {
+            for (auto it = kDrawOrder.rbegin(); it != kDrawOrder.rend() && !hovered; ++it) {
+                const auto& [min, max] = boxes[*it];
+                if (mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) {
+                    hovered = *it;
+                }
             }
         }
-        if (g_dragTarget == DragTarget::kNone && hovered && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
+
+        if (g_dragTarget == DragTarget::kNone && hovered && ImGuiMCP::IsMouseClicked(0)) {
             g_dragTarget = DragTarget::kCenter;
+            g_dragGroup = *hovered;
             g_grabOffset = mouse;
         }
         const bool dragging = g_dragTarget == DragTarget::kCenter;
         if (dragging) {
             if (ImGuiMCP::IsMouseDown(0)) {
-                // Move every selected group by the mouse delta, in HUD units.
-                const float dx = (mouse.x - g_grabOffset.x) / geometry.pxPerUnit;
-                const float dy = (mouse.y - g_grabOffset.y) / geometry.pxPerUnit;
+                auto& place = a_settings.center[g_dragGroup];
+                place.x = std::clamp(place.x + (mouse.x - g_grabOffset.x) / geometry.pxPerUnit, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
+                place.y = std::clamp(place.y + (mouse.y - g_grabOffset.y) / geometry.pxPerUnit, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
                 g_grabOffset = mouse;
-                for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
-                    if (selected(i)) {
-                        auto& place = a_settings.center[i];
-                        place.x = std::clamp(place.x + dx, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
-                        place.y = std::clamp(place.y + dy, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
-                    }
-                }
             } else {
                 g_dragTarget = DragTarget::kNone;
                 NT::SaveSettings();
-                logs::info("Center notifications moved by dragging");
+                logs::info("Center notifications ({}) moved by dragging", *names[g_dragGroup]);
             }
         }
 
-        // Unselected groups dimmed; labels stacked so frames on the same spot
-        // (the default) stay readable.
-        const float lineHeight = ImGuiMCP::GetTextLineHeight();
-        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
-            const auto [min, max] = CenterFrame(geometry, a_settings.center[i]);
-            const bool  active = selected(i) && (dragging || (hovered && !overWindow && g_dragTarget == DragTarget::kNone));
-            const float alpha = !selected(i) ? 0.3F : active ? 1.0F : 0.6F;
-            const auto  color = ImGuiMCP::ColorConvertFloat4ToU32({ 0.45F, 0.8F, 1.0F, alpha });
+        // A dark fill hides the boxes below, so only the top label reads.
+        for (const auto i : kDrawOrder) {
+            const auto& [min, max] = boxes[i];
+            const bool  active = dragging ? g_dragGroup == i : (hovered == i && g_dragTarget == DragTarget::kNone);
+            const auto  color = ImGuiMCP::ColorConvertFloat4ToU32({ 0.45F, 0.8F, 1.0F, active ? 1.0F : 0.7F });
+            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, max, ImGuiMCP::ColorConvertFloat4ToU32({ 0.05F, 0.08F, 0.12F, 0.85F }), 4.0F, 0);
             ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, color, 4.0F, 0, active ? 2.5F : 1.5F);
-            const ImVec2 label{ min.x + 6.0F, min.y + 4.0F + static_cast<float>(i) * lineHeight };
-            ImGuiMCP::ImDrawListManager::AddText(a_list, label, color, names[i]->c_str(), nullptr);
+            ImGuiMCP::ImDrawListManager::AddText(a_list, { min.x + 6.0F, min.y + 4.0F }, color, names[i]->c_str(), nullptr);
         }
     }
 
@@ -538,15 +537,6 @@ namespace NT::Overlay
         }
     }
 
-    void SetCenterSelection(int a_selection)
-    {
-        g_centerSelection = std::clamp(a_selection, 0, static_cast<int>(NT::kCenterGroups));
-    }
-
-    int CenterSelection()
-    {
-        return g_centerSelection.load();
-    }
 
     bool IsPositioning()
     {

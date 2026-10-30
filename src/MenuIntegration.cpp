@@ -139,10 +139,6 @@ namespace
                 s.align = static_cast<NT::Align>(align);
                 NT::SaveSettings();
             }
-            int center = NT::Overlay::CenterSelection();
-            if (Combo(t.centerMove, "##pcenter", center, { &t.centerAll, &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout })) {
-                NT::Overlay::SetCenterSelection(center);
-            }
             if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
                 open = false;
             }

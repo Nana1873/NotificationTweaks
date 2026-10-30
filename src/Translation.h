@@ -39,8 +39,6 @@ namespace NT::Translation
         std::string centerQuest = "Quests";
         std::string centerSkill = "Skills and level";
         std::string centerShout = "Words of power";
-        std::string centerAll = "All together";
-        std::string centerMove = "Move center notifications";
         std::string centerSize = "Size";
         std::string centerPreview = "Preview";
         std::string centerPreviewTip = "Shows a sample popup with this group's place and size. It waits until messages already in line are done.";

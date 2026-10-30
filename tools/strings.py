@@ -35,8 +35,6 @@ STRINGS = [
     ("centerQuest", "Quests", "Quests"),
     ("centerSkill", "Skills and level", "Skills und Stufe"),
     ("centerShout", "Words of power", "Worte der Macht"),
-    ("centerAll", "All together", "Alle zusammen"),
-    ("centerMove", "Move center notifications", "Meldungen in der Mitte verschieben"),
     ("centerSize", "Size", "Größe"),
     ("centerPreview", "Preview", "Vorschau"),
     ("centerPreviewTip", "Shows a sample popup with this group's place and size. It waits until messages already in line are done.", "Zeigt ein Beispiel-Popup mit Platz und Größe dieser Gruppe. Es wartet, bis Meldungen in der Warteschlange durch sind."),

@@ -14,11 +14,6 @@ namespace NT::Overlay
     void SetPositioning(bool a_on);
     bool IsPositioning();
 
-    // Which center notifications a drag in the positioning mode moves: 0 =
-    // all groups together, 1 + CenterGroup = that group alone.
-    void SetCenterSelection(int a_selection);
-    int  CenterSelection();
-
     // Font names of the framework's ImGui atlas, for the menu's font list.
     std::vector<std::string> FontNames();
 
