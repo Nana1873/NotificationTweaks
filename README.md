@@ -21,7 +21,10 @@ plugins put in the top left corner) and draws them itself through
   "25 Gold added" also hides "30 Gold added". Click the eye again, or use
   "Show all hidden again", to bring them back. Lines that are only an
   icon (like OII's save icon) can be hidden the same way. Saved in the
-  INI under `[Hidden]`.
+  INI under `[Hidden]`. The slider at the right edge of a line gives that
+  message its own display time (dimmed while it uses the general one;
+  right-click resets it), matched the same way and saved under
+  `[Durations]`.
 - **Waits for menus:** lines that arrive while the inventory, map or another
   full-screen menu is open appear when it closes (optional). Lines sent
   right before a loading screen show up after it.
