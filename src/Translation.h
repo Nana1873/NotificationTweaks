@@ -14,6 +14,8 @@ namespace NT::Translation
     struct Strings
     {
         std::string pageDisplay = "Display";
+        std::string pageLayout = "Layout";
+        std::string layoutHint = "Move the notification lines and the big notifications in the middle of the screen (locations, also from Dynamic Location Pop-ups; quests; skills and level; words of power). In the editor: drag a frame to move it, use the mouse wheel to resize it, right-click it to put it back.";
         std::string pageCompat = "Compatibility";
         std::string pageHistory = "History";
         std::string historyHint = "The last 100 notifications of this session, newest first.";
@@ -31,18 +33,14 @@ namespace NT::Translation
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";
         std::string headPosition = "Position";
-        std::string dragButton = "Drag on screen...";
-        std::string dragTip = "Closes this menu and shows sample lines. Drag them with the left mouse button, then click Done.";
-        std::string headCenter = "Center notifications";
-        std::string centerHint = "Location popups (also from Dynamic Location Pop-ups), quests, skill increases and words of power keep their Vanilla look. Move them with \"Drag on screen...\", size them here.";
+        std::string dragButton = "Edit layout...";
+        std::string dragTip = "Closes this menu and shows a frame for everything that can be moved.";
         std::string centerLocation = "Locations";
         std::string centerQuest = "Quests";
         std::string centerSkill = "Skills and level";
         std::string centerShout = "Words of power";
-        std::string centerSize = "Size";
-        std::string centerPreview = "Preview";
-        std::string centerPreviewTip = "Shows a sample popup with this group's place and size. It waits until messages already in line are done.";
-        std::string centerReset = "Reset";
+        std::string centerPreview = "Preview:";
+        std::string centerPreviewTip = "Shows a sample popup at this place and size. It waits until messages already in line are done.";
         std::string posX = "Horizontal";
         std::string posY = "Vertical";
         std::string align = "Alignment";
@@ -98,9 +96,8 @@ namespace NT::Translation
         std::string historyIconOnly = "(icon)";
         std::string sample1 = "Notification Tweaks: sample line";
         std::string sample2 = "Drag with the left mouse button";
-        std::string sample3 = "<font color=\"#FF00FF\">A colored line</font>";
-        std::string posWindowTitle = "Notification position";
-        std::string posWindowHint = "Drag the framed lines. The position is saved when you let go.";
+        std::string posWindowTitle = "Layout editor";
+        std::string posWindowHint = "Drag a frame to move it, mouse wheel resizes it, right-click puts it back. Saved right away.";
         std::string done = "Done";
         std::string testText = "This is a test notification.";
         std::string testManyText = "Message";

@@ -151,6 +151,8 @@ namespace NT::Translation
     {
         Strings defaults;
         g_strings.pageDisplay = Translate("$NT_PageDisplay", defaults.pageDisplay);
+        g_strings.pageLayout = Translate("$NT_PageLayout", defaults.pageLayout);
+        g_strings.layoutHint = Translate("$NT_LayoutHint", defaults.layoutHint);
         g_strings.pageCompat = Translate("$NT_PageCompat", defaults.pageCompat);
         g_strings.pageHistory = Translate("$NT_PageHistory", defaults.pageHistory);
         g_strings.historyHint = Translate("$NT_HistoryHint", defaults.historyHint);
@@ -170,16 +172,12 @@ namespace NT::Translation
         g_strings.headPosition = Translate("$NT_HeadPosition", defaults.headPosition);
         g_strings.dragButton = Translate("$NT_DragButton", defaults.dragButton);
         g_strings.dragTip = Translate("$NT_DragTip", defaults.dragTip);
-        g_strings.headCenter = Translate("$NT_HeadCenter", defaults.headCenter);
-        g_strings.centerHint = Translate("$NT_CenterHint", defaults.centerHint);
         g_strings.centerLocation = Translate("$NT_CenterLocation", defaults.centerLocation);
         g_strings.centerQuest = Translate("$NT_CenterQuest", defaults.centerQuest);
         g_strings.centerSkill = Translate("$NT_CenterSkill", defaults.centerSkill);
         g_strings.centerShout = Translate("$NT_CenterShout", defaults.centerShout);
-        g_strings.centerSize = Translate("$NT_CenterSize", defaults.centerSize);
         g_strings.centerPreview = Translate("$NT_CenterPreview", defaults.centerPreview);
         g_strings.centerPreviewTip = Translate("$NT_CenterPreviewTip", defaults.centerPreviewTip);
-        g_strings.centerReset = Translate("$NT_CenterReset", defaults.centerReset);
         g_strings.posX = Translate("$NT_PosX", defaults.posX);
         g_strings.posY = Translate("$NT_PosY", defaults.posY);
         g_strings.align = Translate("$NT_Align", defaults.align);
@@ -235,7 +233,6 @@ namespace NT::Translation
         g_strings.historyIconOnly = Translate("$NT_HistoryIconOnly", defaults.historyIconOnly);
         g_strings.sample1 = Translate("$NT_Sample1", defaults.sample1);
         g_strings.sample2 = Translate("$NT_Sample2", defaults.sample2);
-        g_strings.sample3 = Translate("$NT_Sample3", defaults.sample3);
         g_strings.posWindowTitle = Translate("$NT_PosWindowTitle", defaults.posWindowTitle);
         g_strings.posWindowHint = Translate("$NT_PosWindowHint", defaults.posWindowHint);
         g_strings.done = Translate("$NT_Done", defaults.done);

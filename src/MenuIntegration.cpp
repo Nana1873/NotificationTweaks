@@ -121,7 +121,24 @@ namespace
         }
     }
 
-    // Small window shown while dragging: hint, fine sliders and Done.
+    // One row of buttons: a sample popup per center group at its place.
+    void RenderPreviewButtons()
+    {
+        const auto&        t = NT::Translation::S();
+        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
+        ImGuiMCP::TextUnformatted(t.centerPreview.c_str());
+        Tooltip(t.centerPreviewTip);
+        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
+            ImGuiMCP::SameLine();
+            if (ImGuiMCP::SmallButton((*names[i] + "##cpreview" + std::to_string(i)).c_str())) {
+                NT::CenterNotifications::Preview(static_cast<NT::CenterGroup>(i), *names[i]);
+            }
+            Tooltip(t.centerPreviewTip);
+        }
+    }
+
+    // Small window of the layout editor: hint, fine sliders for the lines,
+    // previews of the center notifications and Done.
     void __stdcall RenderPositionWindow()
     {
         const auto& t = NT::Translation::S();
@@ -139,6 +156,7 @@ namespace
                 s.align = static_cast<NT::Align>(align);
                 NT::SaveSettings();
             }
+            RenderPreviewButtons();
             if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
                 open = false;
             }
@@ -146,41 +164,6 @@ namespace
         ImGuiMCP::End();
         if (!open) {
             ClosePositioning();
-        }
-    }
-
-    // Center notifications: size, preview and reset per group; they move in
-    // the positioning mode.
-    void RenderCenter()
-    {
-        const auto& t = NT::Translation::S();
-        auto&       s = NT::Config();
-        ImGuiMCP::SeparatorText(t.headCenter.c_str());
-        ImGuiMCP::PushTextWrapPos(0.0F);
-        ImGuiMCP::TextDisabled("%s", t.centerHint.c_str());
-        ImGuiMCP::PopTextWrapPos();
-        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
-        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
-            auto&       place = s.center[i];
-            const auto  id = std::to_string(i);
-            ImGuiMCP::TextUnformatted(names[i]->c_str());
-            float percent = place.scale * 100.0F;
-            if (ImGuiMCP::SliderFloat((t.centerSize + "##csize" + id).c_str(), &percent, NT::Limits::kCenterScale.min * 100.0F,
-                    NT::Limits::kCenterScale.max * 100.0F, "%.0f%%", kClamp)) {
-                place.scale = percent / 100.0F;
-            }
-            Commit();
-            if (ImGuiMCP::Button((t.centerPreview + "##cpreview" + id).c_str())) {
-                NT::CenterNotifications::Preview(static_cast<NT::CenterGroup>(i), *names[i]);
-            }
-            Tooltip(t.centerPreviewTip);
-            ImGuiMCP::SameLine();
-            ImGuiMCP::BeginDisabled(place == NT::CenterPlacement{});
-            if (ImGuiMCP::Button((t.centerReset + "##creset" + id).c_str())) {
-                place = {};
-                NT::SaveSettings();
-            }
-            ImGuiMCP::EndDisabled();
         }
     }
 
@@ -207,19 +190,6 @@ namespace
         Commit(ImGuiMCP::Checkbox((t.enabled + "##enabled").c_str(), &s.enabled));
         Tooltip(t.enabledTip);
 
-        ImGuiMCP::SeparatorText(t.headPosition.c_str());
-        if (ImGuiMCP::Button((t.dragButton + "##drag").c_str())) {
-            OpenPositioning();
-        }
-        Tooltip(t.dragTip);
-        int align = static_cast<int>(s.align);
-        if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
-            s.align = static_cast<NT::Align>(align);
-            NT::SaveSettings();
-        }
-
-        RenderCenter();
-
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
         ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max, "%.0f px", kClamp);
@@ -245,8 +215,6 @@ namespace
         // Values most players set once or never.
         ImGuiMCP::Spacing();
         if (ImGuiMCP::CollapsingHeader((t.headAdvanced + "##advanced").c_str())) {
-            PercentSlider(t.posX, "##posx", s.posX, NT::Limits::kPos);
-            PercentSlider(t.posY, "##posy", s.posY, NT::Limits::kPos);
             Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
             Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
             Tooltip(t.showInMenusTip);
@@ -276,6 +244,30 @@ namespace
 
         ImGuiMCP::Spacing();
         ImGuiMCP::TextDisabled("%s", t.footer.c_str());
+    }
+
+    // Page "Layout": the editor for everything that can be moved, plus the
+    // lines' alignment and fine position (for a gamepad, which cannot drag).
+    void __stdcall RenderLayout()
+    {
+        const auto& t = NT::Translation::S();
+        auto&       s = NT::Config();
+        ImGuiMCP::PushTextWrapPos(0.0F);
+        ImGuiMCP::TextDisabled("%s", t.layoutHint.c_str());
+        ImGuiMCP::PopTextWrapPos();
+        if (ImGuiMCP::Button((t.dragButton + "##drag").c_str())) {
+            OpenPositioning();
+        }
+        Tooltip(t.dragTip);
+
+        ImGuiMCP::SeparatorText(t.headPosition.c_str());
+        int align = static_cast<int>(s.align);
+        if (Combo(t.align, "##align", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
+            s.align = static_cast<NT::Align>(align);
+            NT::SaveSettings();
+        }
+        PercentSlider(t.posX, "##posx", s.posX, NT::Limits::kPos);
+        PercentSlider(t.posY, "##posy", s.posY, NT::Limits::kPos);
     }
 
     void __stdcall RenderCompat()
@@ -577,11 +569,12 @@ namespace NT::MenuIntegration
         const auto& t = NT::Translation::S();
         SKSEMenuFramework::SetSection(kSectionName);
         SKSEMenuFramework::AddSectionItem(t.pageDisplay, RenderDisplay);
+        SKSEMenuFramework::AddSectionItem(t.pageLayout, RenderLayout);
         SKSEMenuFramework::AddSectionItem(t.pageCompat, RenderCompat);
         SKSEMenuFramework::AddSectionItem(t.pageHistory, RenderHistory);
         g_positionWindow = SKSEMenuFramework::AddWindow(RenderPositionWindow, true);
         SKSEMenuFramework::AddEvent(OnMenuEvent, 0.0F);
-        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}', '{}'", kSectionName,
-            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageCompat, t.pageHistory);
+        logs::info("Registered SKSE Menu Framework section '{}' (framework v{}), pages '{}', '{}', '{}', '{}'", kSectionName,
+            SKSEMenuFramework::GetMenuFrameworkVersion(), t.pageDisplay, t.pageLayout, t.pageCompat, t.pageHistory);
     }
 }

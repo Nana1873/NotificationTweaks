@@ -12,6 +12,8 @@ namespace
 {
     using ImGuiMCP::ImVec2;
 
+    constexpr float kCenterScaleStep = 0.05F;  // per mouse wheel notch in the layout editor
+
     // Drag frame: minimum width around an empty block and padding, in pixels.
     constexpr float kDragMinWidth = 160.0F;
     constexpr float kDragPadding = 6.0F;
@@ -320,7 +322,7 @@ namespace
         std::vector<Block> blocks;
         if (a_positioning && a_entries.empty()) {
             const auto& strings = NT::Translation::S();
-            for (const auto* sample : { &strings.sample1, &strings.sample2, &strings.sample3 }) {
+            for (const auto* sample : { &strings.sample1, &strings.sample2 }) {
                 blocks.push_back({ Layout(NT::Markup::Parse(*sample), 1, a_metrics.font, a_metrics.size, a_metrics.maxWidth, false), 1.0F });
             }
         } else {
@@ -395,6 +397,18 @@ namespace
             }
         }
 
+        if (inside && !overWindow && g_dragTarget == DragTarget::kNone) {
+            if (ImGuiMCP::IsMouseClicked(1)) {
+                const NT::Settings defaults;
+                a_settings.posX = defaults.posX;
+                a_settings.posY = defaults.posY;
+                NT::SaveSettings();
+            } else if (const float wheel = ImGuiMCP::GetIO()->MouseWheel; wheel != 0.0F) {
+                a_settings.fontSize = std::clamp(a_settings.fontSize + wheel, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max);
+                NT::SaveSettings();
+            }
+        }
+
         const bool active = dragging || (inside && !overWindow && g_dragTarget == DragTarget::kNone);
         const auto frame = ImGuiMCP::ColorConvertFloat4ToU32({ 1.0F, 0.85F, 0.3F, active ? 1.0F : 0.6F });
         ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, frame, 4.0F, 0, active ? 2.5F : 1.5F);
@@ -444,10 +458,19 @@ namespace
             }
         }
 
-        if (g_dragTarget == DragTarget::kNone && hovered && ImGuiMCP::IsMouseClicked(0)) {
-            g_dragTarget = DragTarget::kCenter;
-            g_dragGroup = *hovered;
-            g_grabOffset = mouse;
+        if (g_dragTarget == DragTarget::kNone && hovered) {
+            auto& place = a_settings.center[*hovered];
+            if (ImGuiMCP::IsMouseClicked(0)) {
+                g_dragTarget = DragTarget::kCenter;
+                g_dragGroup = *hovered;
+                g_grabOffset = mouse;
+            } else if (ImGuiMCP::IsMouseClicked(1)) {
+                place = {};  // back to the HUD's own spot and size (Vanilla or a UI mod)
+                NT::SaveSettings();
+            } else if (const float wheel = ImGuiMCP::GetIO()->MouseWheel; wheel != 0.0F) {
+                place.scale = std::clamp(place.scale + wheel * kCenterScaleStep, NT::Limits::kCenterScale.min, NT::Limits::kCenterScale.max);
+                NT::SaveSettings();
+            }
         }
         const bool dragging = g_dragTarget == DragTarget::kCenter;
         if (dragging) {
@@ -463,12 +486,16 @@ namespace
             }
         }
 
-        // A dark fill hides the boxes below, so only the top label reads.
+        // A dark title bar hides the labels of the boxes below, so only the top
+        // one reads; the inside stays see-through for a preview popup.
+        const float barHeight = ImGuiMCP::GetTextLineHeight() + 8.0F;
         for (const auto i : kDrawOrder) {
             const auto& [min, max] = boxes[i];
             const bool  active = dragging ? g_dragGroup == i : (hovered == i && g_dragTarget == DragTarget::kNone);
             const auto  color = ImGuiMCP::ColorConvertFloat4ToU32({ 0.45F, 0.8F, 1.0F, active ? 1.0F : 0.7F });
-            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, max, ImGuiMCP::ColorConvertFloat4ToU32({ 0.05F, 0.08F, 0.12F, 0.85F }), 4.0F, 0);
+            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, max, ImGuiMCP::ColorConvertFloat4ToU32({ 0.05F, 0.08F, 0.12F, 0.2F }), 4.0F, 0);
+            ImGuiMCP::ImDrawListManager::AddRectFilled(a_list, min, { max.x, std::min(max.y, min.y + barHeight) },
+                ImGuiMCP::ColorConvertFloat4ToU32({ 0.05F, 0.08F, 0.12F, 0.9F }), 4.0F, 0);
             ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, color, 4.0F, 0, active ? 2.5F : 1.5F);
             ImGuiMCP::ImDrawListManager::AddText(a_list, { min.x + 6.0F, min.y + 4.0F }, color, names[i]->c_str(), nullptr);
         }
