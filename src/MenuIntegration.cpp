@@ -95,6 +95,9 @@ namespace
             }
             ImGuiMCP::EndCombo();
         }
+        if (NT::Overlay::MissingGlyphs()) {
+            ImGuiMCP::TextWrapped("%s", t.fontMissingGlyphs.c_str());
+        }
     }
 
     void OpenPositioning()

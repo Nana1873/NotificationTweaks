@@ -17,6 +17,9 @@ namespace NT::Overlay
     // Font names of the framework's ImGui atlas, for the menu's font list.
     std::vector<std::string> FontNames();
 
+    // A line had letters no loaded font has (an alphabet SMF did not load).
+    bool MissingGlyphs();
+
     // 0xRRGGBB as an ImGui color.
     inline ImGuiMCP::ImVec4 RgbColor(std::uint32_t a_rgb, float a_alpha = 1.0F)
     {

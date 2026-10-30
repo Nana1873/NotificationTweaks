@@ -94,6 +94,60 @@ namespace
         return ImGuiMCP::GetFont();
     }
 
+    // A line in another alphabet that no loaded font has (SMF loads only the
+    // Character Glyphs chosen in its settings); shown as a hint in the menu.
+    // Cleared once such a line finds a font again.
+    std::atomic<bool> g_missingGlyphs{ false };
+
+    // True when a_font has a glyph for every letter of a_runs. ASCII, icon
+    // runs, general punctuation (… and the like), code points beyond the
+    // 16-bit ImWchar and broken UTF-8 are not checked: no alphabet font
+    // changes how they show.
+    bool HasGlyphs(ImGuiMCP::ImFont* a_font, const std::vector<NT::Markup::Run>& a_runs)
+    {
+        using FindGlyph = const ImGuiMCP::ImFontGlyph* (*)(ImGuiMCP::ImFont*, ImGuiMCP::ImWchar);
+        static const auto find = GetMenuFrameworkFunction<FindGlyph>("ImFont_FindGlyphNoFallback");
+        if (!find || !a_font) {
+            return true;
+        }
+        for (const auto& run : a_runs) {
+            if (!run.iconFace.empty()) {
+                continue;
+            }
+            for (std::size_t i = 0; i < run.text.size();) {
+                const auto code = NT::Text::NextCodePoint(run.text, i);
+                if (code < 0x80 || code > 0xFFFF || (code >= 0x2000 && code <= 0x206F) || code == U'�') {
+                    continue;
+                }
+                if (!find(a_font, static_cast<ImGuiMCP::ImWchar>(code))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // The chosen font, or for a line it lacks letters of the first atlas
+    // font that has them all (SMF's language fonts: RU, PL, CN, ...). Only
+    // that line switches; a line no font fits stays in the chosen one.
+    ImGuiMCP::ImFont* FontFor(const std::vector<NT::Markup::Run>& a_runs, ImGuiMCP::ImFont* a_chosen)
+    {
+        if (HasGlyphs(a_chosen, a_runs)) {
+            return a_chosen;
+        }
+        if (auto* io = ImGuiMCP::GetIO(); io && io->Fonts) {
+            const auto& fonts = io->Fonts->Fonts;
+            for (int i = 0; i < fonts.Size; ++i) {
+                if (fonts.Data[i] != a_chosen && HasGlyphs(fonts.Data[i], a_runs)) {
+                    g_missingGlyphs = false;
+                    return fonts.Data[i];
+                }
+            }
+        }
+        g_missingGlyphs = true;
+        return a_chosen;
+    }
+
     float Measure(ImGuiMCP::ImFont* a_font, float a_size, std::string_view a_text)
     {
         if (a_text.empty()) {
@@ -318,6 +372,7 @@ namespace
     {
         std::vector<Line> lines;
         float             alpha;
+        ImGuiMCP::ImFont* font;  // the chosen one or FontFor's fallback
     };
 
     // Text size and spacing for the current screen, scaled from 1080p.
@@ -352,11 +407,14 @@ namespace
         if (a_positioning && a_entries.empty()) {
             const auto& strings = NT::Translation::S();
             for (const auto* sample : { &strings.sample1, &strings.sample2 }) {
-                blocks.push_back({ Layout(NT::Markup::Parse(*sample), 1, a_metrics.font, a_metrics.size, a_metrics.maxWidth, false), 1.0F });
+                const auto  runs = NT::Markup::Parse(*sample);
+                auto* const font = FontFor(runs, a_metrics.font);
+                blocks.push_back({ Layout(runs, 1, font, a_metrics.size, a_metrics.maxWidth, false), 1.0F, font });
             }
         } else {
             for (const auto& entry : a_entries) {
-                blocks.push_back({ Layout(entry.runs, entry.count, a_metrics.font, a_metrics.size, a_metrics.maxWidth, a_settings.drawIconFonts), Alpha(entry, a_settings) });
+                auto* const font = FontFor(entry.runs, a_metrics.font);
+                blocks.push_back({ Layout(entry.runs, entry.count, font, a_metrics.size, a_metrics.maxWidth, a_settings.drawIconFonts), Alpha(entry, a_settings), font });
             }
         }
         if (a_settings.newestOnTop) {
@@ -379,7 +437,7 @@ namespace
                         ImGuiMCP::ColorConvertFloat4ToU32({ 0.0F, 0.0F, 0.0F, a_settings.backgroundAlpha * block.alpha }), pad, 0);
                 }
                 for (const auto& piece : line.pieces) {
-                    DrawText(a_list, a_metrics.font, a_metrics.size, { x + piece.x, y }, piece, a_settings, block.alpha);
+                    DrawText(a_list, block.font, a_metrics.size, { x + piece.x, y }, piece, a_settings, block.alpha);
                 }
                 y += a_metrics.lineHeight;
             }
@@ -609,6 +667,11 @@ namespace NT::Overlay
     bool IsPositioning()
     {
         return g_positioning.load();
+    }
+
+    bool MissingGlyphs()
+    {
+        return g_missingGlyphs.load();
     }
 
     std::vector<std::string> FontNames()

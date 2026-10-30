@@ -43,6 +43,7 @@ namespace NT::Translation
         std::string maxVisible = "Max. visible messages";
         std::string headStyle = "Font and style";
         std::string font = "Font";
+        std::string fontMissingGlyphs = "Some notifications use letters that no loaded font has. Choose their alphabet in the Menu Framework under Options > Open Settings > Character Glyphs.";
         std::string fontDefault = "Menu Framework default";
         std::string fontSize = "Font size";
         std::string fontSizeTip = "Size at 1080p; other resolutions scale with the screen height.";

@@ -180,6 +180,7 @@ namespace NT::Translation
         g_strings.maxVisible = Translate("$NT_MaxVisible", defaults.maxVisible);
         g_strings.headStyle = Translate("$NT_HeadStyle", defaults.headStyle);
         g_strings.font = Translate("$NT_Font", defaults.font);
+        g_strings.fontMissingGlyphs = Translate("$NT_FontMissingGlyphs", defaults.fontMissingGlyphs);
         g_strings.fontDefault = Translate("$NT_FontDefault", defaults.fontDefault);
         g_strings.fontSize = Translate("$NT_FontSize", defaults.fontSize);
         g_strings.fontSizeTip = Translate("$NT_FontSizeTip", defaults.fontSizeTip);

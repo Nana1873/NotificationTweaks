@@ -39,6 +39,7 @@ STRINGS = [
     ("maxVisible", "Max. visible messages", "Max. sichtbare Meldungen"),
     ("headStyle", "Font and style", "Schrift und Stil"),
     ("font", "Font", "Schrift"),
+    ("fontMissingGlyphs", "Some notifications use letters that no loaded font has. Choose their alphabet in the Menu Framework under Options > Open Settings > Character Glyphs.", "Einige Meldungen nutzen Buchstaben, die keine geladene Schrift hat. Ihr Alphabet im Menu Framework unter Options > Open Settings > Character Glyphs auswählen."),
     ("fontDefault", "Menu Framework default", "Standard des Menu Framework"),
     ("fontSize", "Font size", "Schriftgröße"),
     ("fontSizeTip", "Size at 1080p; other resolutions scale with the screen height.", "Größe bei 1080p; andere Auflösungen skalieren mit der Bildschirmhöhe."),
