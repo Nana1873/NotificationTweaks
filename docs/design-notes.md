@@ -104,9 +104,14 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   font size; boxes: 5 % per notch), right-click puts it back. A drag saves
   on release, the wheel half a second after the last notch, right-click at
   once. The topmost frame under the mouse takes a gesture (center boxes
-  above the lines), so one notch never changes two things. The window pauses the game, so nothing that needs
-  the HUD to run (a sample popup) can be shown there; an earlier preview
-  button was dropped for that reason.
+  above the lines), so one notch never changes two things. Arrow keys
+  move the last clicked frame one pixel (Shift: ten); the window takes no
+  keyboard navigation for that. The lines' alignment follows the block's
+  center (left third left, right third right, else centered), so the
+  block grows away from the nearer screen edge; there is no separate
+  alignment setting in the UI. The window pauses the game, so nothing
+  that needs the HUD to run (a sample popup) can be shown there; an
+  earlier preview button was dropped for that reason.
 
 ## Settings and strings
 

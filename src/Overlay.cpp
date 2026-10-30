@@ -39,7 +39,7 @@ namespace
     Target                 g_selected = Target::kLines;  // last clicked frame, moved by the arrow keys
     std::size_t            g_selectedGroup = 0;
     ImVec2                 g_grabMouse{ 0.0F, 0.0F };
-    ImVec2                 g_grabLines{ 0.0F, 0.0F };  // posX/posY at grab
+    ImVec2                 g_grabLines{ 0.0F, 0.0F };  // left edge and top of the lines' block at grab, screen pixels
     NT::CenterPlacement    g_grabPlace;                 // the group's placement at grab
     double                 g_saveAt = 0.0;              // pending save (wheel), ImGui time; 0 = none
 
@@ -392,6 +392,18 @@ namespace
     // most players move), so dragging one off the pile brings the next up.
     // Left drag moves (saved on release), the wheel resizes (lines: font
     // size; boxes: scale; saved shortly after), right-click puts it back.
+    // Places the lines' block with its left edge at a_left and its top at
+    // a_top (screen pixels). The alignment follows the block's center: left
+    // third left-aligned, right third right-aligned (lines grow away from
+    // the screen edge), else centered; posX is the anchor of that alignment.
+    void PlaceLines(NT::Settings& a_settings, float a_left, float a_top, float a_width, ImVec2 a_screen)
+    {
+        const float center = a_left + a_width * 0.5F;
+        a_settings.align = center < a_screen.x / 3.0F ? NT::Align::kLeft : center > a_screen.x * 2.0F / 3.0F ? NT::Align::kRight : NT::Align::kCenter;
+        a_settings.posX = std::clamp((a_left - AlignOffset(a_settings.align, a_width)) / a_screen.x, 0.0F, 1.0F);
+        a_settings.posY = std::clamp(a_top / a_screen.y, 0.0F, 1.0F);
+    }
+
     void HandleLayoutEditor(ImGuiMCP::ImDrawList* a_list, const std::vector<Block>& a_blocks, ImVec2 a_anchor, ImVec2 a_screen,
         const Metrics& a_metrics, NT::Settings& a_settings)
     {
@@ -442,7 +454,7 @@ namespace
                 g_selected = hovered;
                 g_selectedGroup = hoveredGroup;
                 g_grabMouse = mouse;
-                g_grabLines = { a_settings.posX, a_settings.posY };
+                g_grabLines = { left, a_anchor.y };
                 g_grabPlace = place ? *place : NT::CenterPlacement{};
             } else if (ImGuiMCP::IsMouseClicked(1)) {
                 if (place) {
@@ -451,6 +463,7 @@ namespace
                     const NT::Settings defaults;
                     a_settings.posX = defaults.posX;
                     a_settings.posY = defaults.posY;
+                    a_settings.align = defaults.align;
                 }
                 NT::SaveSettings();
             } else if (const float wheel = ImGuiMCP::GetIO()->MouseWheel; wheel != 0.0F) {
@@ -467,8 +480,7 @@ namespace
             const ImVec2 delta{ mouse.x - g_grabMouse.x, mouse.y - g_grabMouse.y };
             if (ImGuiMCP::IsMouseDown(0)) {
                 if (g_dragTarget == Target::kLines) {
-                    a_settings.posX = std::clamp(g_grabLines.x + delta.x / a_screen.x, 0.0F, 1.0F);
-                    a_settings.posY = std::clamp(g_grabLines.y + delta.y / a_screen.y, 0.0F, 1.0F);
+                    PlaceLines(a_settings, g_grabLines.x + delta.x, g_grabLines.y + delta.y, width, a_screen);
                 } else if (geometry.valid) {
                     auto& place = a_settings.center[g_dragGroup];
                     place.x = std::clamp(g_grabPlace.x + delta.x / geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
@@ -489,8 +501,7 @@ namespace
                     (ImGuiMCP::IsKeyPressed(ImGuiMCP::ImGuiKey_UpArrow) ? step : 0.0F) };
             if (move.x != 0.0F || move.y != 0.0F) {
                 if (g_selected == Target::kLines) {
-                    a_settings.posX = std::clamp(a_settings.posX + move.x / a_screen.x, 0.0F, 1.0F);
-                    a_settings.posY = std::clamp(a_settings.posY + move.y / a_screen.y, 0.0F, 1.0F);
+                    PlaceLines(a_settings, left + move.x, a_anchor.y + move.y, width, a_screen);
                 } else if (geometry.valid) {
                     auto& place = a_settings.center[g_selectedGroup];
                     place.x = std::clamp(place.x + move.x / geometry.pxPerUnitX, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);

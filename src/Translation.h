@@ -36,10 +36,6 @@ namespace NT::Translation
         std::string centerQuest = "Quests";
         std::string centerSkill = "Skills and level";
         std::string centerShout = "Words of power";
-        std::string align = "Alignment";
-        std::string alignLeft = "Left";
-        std::string alignCenter = "Center";
-        std::string alignRight = "Right";
         std::string newestOnTop = "Newest line on top";
         std::string showInMenus = "Show in menus";
         std::string showInMenusTip = "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.";

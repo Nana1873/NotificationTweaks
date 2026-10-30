@@ -121,12 +121,11 @@ namespace
         }
     }
 
-    // Small window of the layout editor: hint, the lines' alignment and Done
-    // (fine moves: arrow keys; sliders on the Layout page for a gamepad).
+    // Small window of the layout editor: hint and Done. The lines' alignment
+    // follows where the block is placed (Overlay).
     void __stdcall RenderPositionWindow()
     {
         const auto& t = NT::Translation::S();
-        auto&       s = NT::Config();
         auto*       viewport = ImGuiMCP::GetMainViewport();
         ImGuiMCP::SetNextWindowPos({ viewport->Size.x * 0.5F, viewport->Size.y * 0.82F }, ImGuiMCP::ImGuiCond_Appearing, { 0.5F, 0.5F });
         bool open = true;
@@ -134,11 +133,6 @@ namespace
                 // No keyboard navigation: the arrow keys move the selected frame.
                 ImGuiMCP::ImGuiWindowFlags_AlwaysAutoResize | ImGuiMCP::ImGuiWindowFlags_NoCollapse | ImGuiMCP::ImGuiWindowFlags_NoNav)) {
             ImGuiMCP::TextUnformatted(t.posWindowHint.c_str());
-            int align = static_cast<int>(s.align);
-            if (Combo(t.align, "##palign", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
-                s.align = static_cast<NT::Align>(align);
-                NT::SaveSettings();
-            }
             if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
                 open = false;
             }

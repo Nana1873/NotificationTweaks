@@ -173,10 +173,6 @@ namespace NT::Translation
         g_strings.centerQuest = Translate("$NT_CenterQuest", defaults.centerQuest);
         g_strings.centerSkill = Translate("$NT_CenterSkill", defaults.centerSkill);
         g_strings.centerShout = Translate("$NT_CenterShout", defaults.centerShout);
-        g_strings.align = Translate("$NT_Align", defaults.align);
-        g_strings.alignLeft = Translate("$NT_AlignLeft", defaults.alignLeft);
-        g_strings.alignCenter = Translate("$NT_AlignCenter", defaults.alignCenter);
-        g_strings.alignRight = Translate("$NT_AlignRight", defaults.alignRight);
         g_strings.newestOnTop = Translate("$NT_NewestOnTop", defaults.newestOnTop);
         g_strings.showInMenus = Translate("$NT_ShowInMenus", defaults.showInMenus);
         g_strings.showInMenusTip = Translate("$NT_ShowInMenusTip", defaults.showInMenusTip);
