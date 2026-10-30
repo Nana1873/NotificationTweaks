@@ -349,16 +349,18 @@ namespace
     }
 
     // Own display time of a history line, at the right edge of its row.
-    // Shown while the row is hovered, while dragged and whenever the line
-    // has its own time; right-click goes back to the general setting.
-    std::uint64_t g_durationDragged = 0;  // history id of the slider being dragged
+    // Always there (reachable with a gamepad too); dimmed while the line
+    // uses the general setting and its row is not hovered, so the lines
+    // with their own time stand out. Right-click goes back to the general
+    // setting.
+    constexpr float kDefaultTimeAlpha = 0.45F;
 
     float DurationSliderWidth()
     {
         return ImGuiMCP::GetFontSize() * 5.0F;
     }
 
-    void DurationSlider(const std::string& a_key, std::optional<float> a_own, bool a_disabled, std::uint64_t a_id)
+    void DurationSlider(const std::string& a_key, std::optional<float> a_own, bool a_disabled, bool a_dim, std::uint64_t a_id)
     {
         const auto& t = NT::Translation::S();
         float       value = a_own.value_or(NT::Config().duration);
@@ -369,16 +371,13 @@ namespace
             defaultLabel.insert(pos, 1, '%');
         }
         ImGuiMCP::BeginDisabled(a_disabled);
+        ImGuiMCP::PushStyleVar(ImGuiMCP::ImGuiStyleVar_Alpha, ImGuiMCP::GetStyle()->Alpha * (a_dim ? kDefaultTimeAlpha : 1.0F));
         ImGuiMCP::SetNextItemWidth(DurationSliderWidth());
         if (ImGuiMCP::SliderFloat(std::format("###time{}", a_id).c_str(), &value, NT::Limits::kDuration.min, NT::Limits::kDuration.max,
                 a_own ? "%.1f s" : defaultLabel.c_str(), kClamp)) {
             NT::Capture::SetDuration(a_key, value);
         }
-        if (ImGuiMCP::IsItemActive()) {
-            g_durationDragged = a_id;
-        } else if (g_durationDragged == a_id) {
-            g_durationDragged = 0;
-        }
+        ImGuiMCP::PopStyleVar();
         if (ImGuiMCP::IsItemDeactivatedAfterEdit()) {
             NT::Capture::SaveDurations();
         }
@@ -483,11 +482,9 @@ namespace
                 const auto own = durations.contains(key) ? std::optional{ durations.at(key) } : std::nullopt;
                 const bool hovered = ImGuiMCP::IsMouseHoveringRect(rowStartScreen,
                     { rowStartScreen.x + ImGuiMCP::GetWindowContentRegionMax().x, rowStartScreen.y + (rowEnd.y - rowStart.y) });
-                if (own || hovered || g_durationDragged == it->id) {
-                    ImGuiMCP::SetCursorPos({ sliderX, rowStart.y });
-                    DurationSlider(key, own, isHidden || !NT::CaptureEnabled(), it->id);
-                    ImGuiMCP::SetCursorPos(rowEnd);
-                }
+                ImGuiMCP::SetCursorPos({ sliderX, rowStart.y });
+                DurationSlider(key, own, isHidden || !NT::CaptureEnabled(), !own && !hovered, it->id);
+                ImGuiMCP::SetCursorPos(rowEnd);
             }
             ImGuiMCP::PopTextWrapPos();
             if (!any) {

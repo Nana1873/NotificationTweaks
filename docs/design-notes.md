@@ -178,9 +178,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   for every line with the same hide key (`[Durations]`: `Count`, `LineN`
   escaped like `[Hidden]`, `TimeN` in seconds, range of the general
   Duration). Fade in and fade out stay general.
-- It shows while the row is hovered, while dragged and whenever the line
-  has its own time; right-click goes back to the general setting. The
-  value applies to live lines at once; the file is written on release.
+- It is always there (a hover-only slider is out of reach with a gamepad)
+  and dimmed while the line uses the general setting and its row is not
+  hovered, so lines with their own time stand out. Right-click goes back
+  to the general setting. The value applies to live lines at once; the
+  file is written on release.
 - `Entry::duration` is resolved when a line arrives or merges and when a
   time changes; the overlay's alpha, lifetime and MaxVisible fade and the
   stacking window use it instead of the general Duration.
