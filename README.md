@@ -51,7 +51,7 @@ Vanilla HUD at once (the history keeps recording).
 
 ## Requirements
 
-- Skyrim SE/AE (Address Library build; developed and tested on 1.7.104)
+- Skyrim SE/AE (Address Library build; developed on 1.7.104, also tested on SE 1.5.97 and AE 1.6.1170)
 - SKSE64, Address Library for SKSE Plugins
 - SKSE Menu Framework 3.x (without it the plugin stays inactive and the
   Vanilla HUD keeps the notifications)
