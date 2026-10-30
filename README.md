@@ -9,8 +9,12 @@ plugins put in the top left corner) and draws them itself through
 
 - **No queue delay:** several notifications appear at once instead of one
   after another.
-- **Free placement:** drag the block anywhere on screen, or set it with
-  sliders; left, centered or right alignment.
+- **Free placement:** a layout editor (menu page Layout) to drag the block
+  anywhere on screen, or sliders; left, centered or right alignment.
+- **Center notifications:** location popups (also from Dynamic Location
+  Pop-ups), quest updates, skill increases and words of power keep their
+  Vanilla look but can each get their own place and size in the same
+  editor (mouse wheel resizes, right-click puts back).
 - **Style:** font from the Menu Framework, size (relative to 1080p, so it
   looks the same at any resolution), color, shadow or outline, optional
   background, display time and fades.

@@ -96,9 +96,14 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   full-screen menu is open and appear when it closes; those menus are detected by name because
   Skyrim Souls RE keeps them unpaused, so `GameIsPaused()` is false there.
   Dialogue is not on the list: lines show during conversations.
-- Drag mode: an SMF window (`AddWindow`) with Done replaces the main
-  window; the frame around the block follows the mouse and saves on
-  release.
+- Layout editor ("Edit layout...", page Layout): an SMF window
+  (`AddWindow`) with Done replaces the main window. A yellow frame around
+  the lines and a labelled box per center group (see Center
+  notifications) follow a left-button drag; the mouse wheel resizes (lines:
+  font size; boxes: 5 % per notch), right-click puts it back. Every change
+  is saved right away. The window pauses the game, so nothing that needs
+  the HUD to run (a sample popup) can be shown there; an earlier preview
+  button was dropped for that reason.
 
 ## Settings and strings
 
@@ -192,6 +197,33 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 - `Entry::duration` is resolved when a line arrives or merges and when a
   time changes; the overlay's alpha, lifetime and MaxVisible fade and the
   stacking window use it instead of the general Duration.
+
+## Center notifications (1.3.0)
+
+- Location discovered (also Dynamic Location Pop-ups, which sends a plain
+  `kLocationDiscovery` HUD message, see its `Manager::SendLocationPopup`),
+  quests and objectives, skill and level increases, words of power and
+  dragon souls all show in `HUDMovieBaseInstance.QuestUpdateBaseInstance`
+  (Vanilla and Dragonborn UI `hudmenu.swf` alike), one entry at a time from
+  the `HUDNotifications` queue, whose `root` is that clip.
+- `CenterNotifications` (game thread, around the `HUDNotifications::Update`
+  hook): when the front entry leaves the queue it starts showing, so the
+  clip gets that group's offset (HUD units) and scale via
+  `SetDisplayInfo`, relative to the Vanilla values read once; a group
+  without a placement, or a type that is no center group, puts it back.
+  Entries never overlap, so groups can sit in different places.
+  `[CenterNotifications]` holds `<Group>X/Y/Scale` for Location, Quest,
+  Skill, Shout.
+- The editor's boxes are drawn from a geometry measured about once a
+  second (`localToGlobal` of the clip origin through the movie's visible
+  frame): origin in screen pixels and pixels per HUD unit. The box is an
+  estimate of the title line (`kTextOffsetY`, `kFrameWidth/Height`); in
+  game a popup lands inside it.
+- Test hook: with `VerboseLog=1` a notification `NTDEBUG:<type>:<text>`
+  becomes a HUD message of that type (26 = location), sent like DLP does.
+- Checked in game (AE 1.7.104, Dragonborn UI HUD): location popup and a
+  quest objective right after it each at their own place and size; boxes
+  drag, resize and reset; values survive a restart.
 
 ## Testing notes
 
