@@ -55,7 +55,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   Vertreiber - Ziel hinzugefügt" + "... - Bereich hinzugefügt").
 - The engine already drops a `Debug.Notification` whose text repeats an
   earlier one (four identical sends reached the hook once), so stacking
-  "(x2)" mainly matters for other senders.
+  "(x2)" mainly matters for other senders. A stacked line moves to the
+  back as the newest (behind it only lines still waiting in queue mode):
+  toggles like Auto Nearby Quest Tracker's hotkey send "Enabled",
+  "Disabled", "Enabled", and left in place the bottom line showed the
+  wrong state.
 - **BoS**: Bimbos of Skyrim 1.9.1.2 never splits text itself (every
   compiled script in the instance was searched); each thought is one
   `Debug.Notification("<font color=\"#FF00FF\">...</font>")`. The rule

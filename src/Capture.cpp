@@ -279,14 +279,21 @@ namespace NT::Capture
         }
 
         if (s.stackDuplicates) {
-            for (auto& entry : g_entries) {
-                if (entry.raw == raw && entry.age < s.visibleTime) {
-                    ++entry.count;
-                    entry.age = std::min(entry.age, s.fadeIn);
-                    if (auto* history = FindHistory(entry.id)) {
-                        history->count = entry.count;
+            for (auto it = g_entries.begin(); it != g_entries.end(); ++it) {
+                if (it->raw == raw && it->age < s.visibleTime) {
+                    ++it->count;
+                    it->age = std::min(it->age, s.fadeIn);
+                    it->arrival = now;
+                    if (auto* history = FindHistory(it->id)) {
+                        history->count = it->count;
                         history->time = std::chrono::system_clock::now();
                     }
+                    // The repeat is the newest line: move it to the back, or a
+                    // toggle sent on, off, on reads "on (x2)" above "off" and
+                    // the bottom line shows the wrong state. Lines still
+                    // waiting in queue mode stay behind it.
+                    std::rotate(it, std::next(it), g_entries.end());
+                    std::ranges::stable_partition(g_entries, [](const Entry& a_entry) { return a_entry.started || a_entry.hidden; });
                     return true;
                 }
             }
