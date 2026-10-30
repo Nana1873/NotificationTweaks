@@ -25,6 +25,11 @@ namespace
 
     SKSEMenuFramework::Model::WindowInterface* g_positionWindow = nullptr;
 
+    // The editor window pauses the game, which freezes a preview popup's
+    // animation; the pause is lifted until this ImGui time after a preview.
+    constexpr double kPreviewSeconds = 5.0;
+    double           g_previewUntil = 0.0;
+
     // Ctrl+Click lets the player type a value; keep it inside the range.
     constexpr auto kClamp = ImGuiMCP::ImGuiSliderFlags_AlwaysClamp;
 
@@ -132,6 +137,7 @@ namespace
             ImGuiMCP::SameLine();
             if (ImGuiMCP::SmallButton((*names[i] + "##cpreview" + std::to_string(i)).c_str())) {
                 NT::CenterNotifications::Preview(static_cast<NT::CenterGroup>(i), *names[i]);
+                g_previewUntil = ImGuiMCP::GetTime() + kPreviewSeconds;
             }
             Tooltip(t.centerPreviewTip);
         }
@@ -157,6 +163,9 @@ namespace
                 NT::SaveSettings();
             }
             RenderPreviewButtons();
+            if (g_positionWindow) {
+                g_positionWindow->BlockUserInput = ImGuiMCP::GetTime() >= g_previewUntil;
+            }
             if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
                 open = false;
             }
