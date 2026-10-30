@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(NotificationTweaks VERSION 1.2.0 LANGUAGES CXX)
+project(NotificationTweaks VERSION 1.3.0 LANGUAGES CXX)
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
