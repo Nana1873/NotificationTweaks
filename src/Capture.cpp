@@ -13,6 +13,7 @@ namespace
     std::uint64_t                         g_nextID = 1;
     std::set<std::string>                 g_hidden;     // hide keys, see NT::Markup::LineHideKey
     std::map<std::string, float>          g_durations;  // own display time per hide key
+    std::atomic<bool>                     g_durationsChanged{ false };  // not written to the INI yet
 
     // Caller holds g_lock.
     bool IsHidden(std::string_view a_raw)
@@ -175,7 +176,7 @@ namespace
     }
 
     // The engine's repeat filter in ShowHUDMessage (SE 52050 / AE 52933),
-    // see design-notes "Repeats". We stack repeats ourselves, so it is
+    // see design-notes, Merge rules, "Repeats". We stack repeats ourselves, so it is
     // cleared after each line we take. Only on the AE versions whose layout
     // was checked (Install); the SE ID of the table is unverified.
     struct RecentMessage
@@ -186,15 +187,19 @@ namespace
     constexpr std::size_t kRecentMessageSlots = 8;
     constexpr std::uint64_t kRecentMessagesAE = 406616;
     constexpr std::uint64_t kRecentMessagesGuardAE = 406624;  // static-init guard right behind the table
-    constexpr REL::Version  kRepeatFilterFirst{ 1, 6, 317, 0 };
-    constexpr REL::Version  kRepeatFilterLast{ 1, 7, 104, 0 };
+    // The AE versions whose Address Library was checked to have both IDs,
+    // 64 bytes apart. A missing ID would stop the game at startup (NG's
+    // lookup does not fail softly), so any other version is left alone.
+    constexpr REL::Version kRepeatFilterVersions[] = { { 1, 6, 317, 0 }, { 1, 6, 318, 0 }, { 1, 6, 323, 0 }, { 1, 6, 342, 0 },
+        { 1, 6, 353, 0 }, { 1, 6, 629, 0 }, { 1, 6, 640, 0 }, { 1, 6, 659, 0 }, { 1, 6, 1130, 0 }, { 1, 6, 1170, 0 },
+        { 1, 6, 1179, 0 }, { 1, 7, 99, 0 }, { 1, 7, 104, 0 } };
 
     RecentMessage* g_recentMessages = nullptr;  // set by Install when the layout matches
 
     void FindEngineRepeatFilter()
     {
         const auto version = REL::Module::get().version();
-        if (!REL::Module::IsAE() || version < kRepeatFilterFirst || version > kRepeatFilterLast) {
+        if (!REL::Module::IsAE() || std::ranges::find(kRepeatFilterVersions, version) == std::ranges::end(kRepeatFilterVersions)) {
             logs::info("Engine repeat filter left alone on {}", version.string());
             return;
         }
@@ -272,7 +277,7 @@ namespace
                             logs::info("Plain notification taken from the HUDNotifications queue (direct sender)");
                         }
                         if (const char* text = it->text.c_str(); text && *text) {
-                            Take(text);
+                            Take(text);  // queued lines are always removed, taken or not
                         }
                         // Vanilla plays a queued entry's sound when it shows the
                         // line; the entry is gone after this, so play it here.
@@ -353,8 +358,7 @@ namespace NT::Capture
                 [&](const NT::Capture::Entry& a_entry) { return a_entry.hidden == hidden; });
             if (newest != g_entries.rend()) {
                 auto& entry = *newest;
-                const float visibleTime = entry.duration ? s.fadeIn + *entry.duration : s.visibleTime;
-                if (entry.raw == raw && entry.age < visibleTime) {
+                if (entry.raw == raw && entry.age < s.fadeIn + entry.duration.value_or(s.duration)) {
                     ++entry.count;
                     entry.age = std::min(entry.age, s.fadeIn);
                     if (auto* history = FindHistory(entry.id)) {
@@ -473,6 +477,7 @@ namespace NT::Capture
             return;
         }
         std::scoped_lock lock{ g_lock };
+        g_durationsChanged = true;
         if (a_seconds) {
             g_durations[a_key] = *a_seconds;
         } else {
@@ -486,7 +491,17 @@ namespace NT::Capture
     void SaveDurations()
     {
         // File I/O outside the lock, so Push on the game thread never waits on it.
-        NT::WriteDurations(Durations());
+        g_durationsChanged = false;
+        const auto durations = Durations();
+        NT::WriteDurations(durations);
+        logs::info("{} own display time(s) saved", durations.size());
+    }
+
+    void SaveDurationsIfChanged()
+    {
+        if (g_durationsChanged) {
+            SaveDurations();
+        }
     }
 
     void SendTest(std::vector<std::string> a_texts)

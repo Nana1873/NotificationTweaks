@@ -77,6 +77,7 @@ namespace NT::Capture
     std::map<std::string, float> Durations();
     void                         SetDuration(const std::string& a_key, std::optional<float> a_seconds);
     void                         SaveDurations();
+    void                         SaveDurationsIfChanged();  // e.g. the slider's row vanished mid-edit
 
     // Sends a notification through the regular game path (SKSE task), so
     // menu tests go through the same hook as every other sender.

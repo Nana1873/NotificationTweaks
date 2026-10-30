@@ -26,6 +26,7 @@ namespace NT::Translation
         std::string historyShowAll = "Show all hidden again";
         std::string historyTime = "Display time for this message (numbers match any number). Right-click: back to the general setting.";
         std::string historyTimeDefault = "Default";
+        std::string historyTimeOff = "Own display times work while \"Replace Vanilla notifications\" is on.";
         std::string headAdvanced = "Advanced";
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";

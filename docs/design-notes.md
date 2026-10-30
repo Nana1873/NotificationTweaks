@@ -67,7 +67,8 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   ShowHUDMessage (SE 52050 / AE 52933) also drops a line sent with
   `cancelIfAlreadyQueued` (Debug.Notification, most plugins) whose text
   hash is among the last eight of the past 5 s; Auto Nearby Quest Tracker
-  lost its newest state that way. On AE 1.6.317 to 1.7.104 the plugin
+  lost its newest state that way. On the AE versions whose Address
+  Library was checked (1.6.317 to 1.6.1179, 1.7.99, 1.7.104) the plugin
   clears that table (ID 406616, 8 x {u32 hash, u32 ms}, checked at startup
   against the guard right behind it, ID 406624) after each line it takes,
   unless stacking is off. SE, VR and newer runtimes keep the filter.
@@ -176,13 +177,15 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 
 - A slider at the right edge of a History row sets the fully visible time
   for every line with the same hide key (`[Durations]`: `Count`, `LineN`
-  escaped like `[Hidden]`, `TimeN` in seconds, range of the general
-  Duration). Fade in and fade out stay general.
+  escaped like `[Hidden]`, `TimeN` in seconds within `Limits::kDuration`).
+  Fade in and fade out stay general.
 - It is always there (a hover-only slider is out of reach with a gamepad)
   and dimmed while the line uses the general setting and its row is not
-  hovered, so lines with their own time stand out. Right-click goes back
+  hovered, so lines with their own time stand out. With "Replace Vanilla
+  notifications" off it is disabled, like the eye. Right-click goes back
   to the general setting. The value applies to live lines at once; the
-  file is written on release.
+  file is written on release (or, if the row vanished mid-edit, on the
+  next History frame or when the menu closes).
 - `Entry::duration` is resolved when a line arrives or merges and when a
   time changes; the overlay's alpha, lifetime and MaxVisible fade and the
   stacking window use it instead of the general Duration.
@@ -199,6 +202,13 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   `NT_TEST_SWF` (path to a .swf) and `NT_TEST_FONT` (font name) also loads
   a real font library and writes its "w" glyph as `glyph_w.pgm`. Hooks,
   overlay, textures and menu stay in-game tests.
+- Not unit-tested: the `[Durations]` / `WriteKeySection` round trip (the
+  escaping it uses is), the engine repeat-filter table and the History
+  slider. Checked in game on AE 1.7.104: three fast Auto Nearby Quest
+  Tracker toggles all arrive, Papyrus A, B, A, A shows "A / B / A (x2)",
+  the startup log has no "Engine repeat filter left alone" line there,
+  and the slider (dimmed default, own time, right-click reset, saved on
+  release) works by hand.
 - `tools/deploy.ps1 [-Register]`, then
   `..\..\tools\agent\launch-skyrim-skse.ps1` and DevBench. Most tests need
   no save: `coc riverwood` (DevBench console) from the main menu avoids

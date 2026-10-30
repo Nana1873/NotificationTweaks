@@ -24,7 +24,7 @@ namespace
         c.mergeBos = s.mergeBos;
         c.mergeGeneric = s.mergeGeneric;
         c.mergeWindow = s.mergeWindow;
-        c.visibleTime = s.fadeIn + s.duration;
+        c.duration = s.duration;
         c.fadeIn = s.fadeIn;
         c.ypsLimit = s.ypsLimit;
         c.drawIconFonts = s.drawIconFonts;
@@ -40,9 +40,9 @@ namespace
         return ec ? std::string(kIniRelative) : path.string();
     }
 
-    // ReadString's buffer; [Hidden] values must fit into it.
+    // ReadString's buffer; [Hidden] and [Durations] keys must fit into it.
     constexpr std::size_t kReadBuffer = 2048;
-    constexpr std::size_t kMaxHiddenValue = kReadBuffer - 48;  // headroom for the quotes
+    constexpr std::size_t kMaxKeyValue = kReadBuffer - 48;  // headroom for the quotes
 
     std::string ReadString(const char* a_section, const char* a_key, const std::string& a_default, const std::string& a_path)
     {
@@ -56,7 +56,7 @@ namespace
     struct KeyLine
     {
         std::string                key;
-        std::optional<std::string> time;
+        std::optional<float>       time;  // seconds, written with one decimal
     };
 
     void WriteKeySection(const char* a_section, const std::vector<KeyLine>& a_lines)
@@ -72,7 +72,7 @@ namespace
         int         count = 0;
         for (const auto& line : a_lines) {
             const auto value = NT::Text::PercentEscape(line.key);
-            if (value.size() > kMaxHiddenValue) {
+            if (value.size() > kMaxKeyValue) {
                 logs::warn("[{}] line too long to save ({} bytes), kept for this session only", a_section, value.size());
                 continue;
             }
@@ -81,7 +81,7 @@ namespace
             lines += std::format("Line{}=\"{}\"", ++count, value);
             lines += '\0';
             if (line.time) {
-                lines += std::format("Time{}={}", count, *line.time);
+                lines += std::format("Time{}={:.1f}", count, *line.time);
                 lines += '\0';
             }
         }
@@ -108,6 +108,18 @@ namespace
     int ReadInt(const char* a_section, const char* a_key, int a_default, NT::Range<int> a_range, const std::string& a_path)
     {
         return std::clamp(static_cast<int>(GetPrivateProfileIntA(a_section, a_key, a_default, a_path.c_str())), a_range.min, a_range.max);
+    }
+
+    // Reads a key list section written by WriteKeySection: a_line(index, key)
+    // for each non-empty LineN.
+    void ReadKeySection(const char* a_section, const std::string& a_path, const std::function<void(int, std::string)>& a_line)
+    {
+        const int count = ReadInt(a_section, "Count", 0, { 0, 10000 }, a_path);
+        for (int i = 1; i <= count; ++i) {
+            if (auto key = NT::Text::PercentUnescape(ReadString(a_section, std::format("Line{}", i).c_str(), "", a_path)); !key.empty()) {
+                a_line(i, std::move(key));
+            }
+        }
     }
 
     bool ReadBool(const char* a_section, const char* a_key, bool a_default, const std::string& a_path)
@@ -265,14 +277,8 @@ namespace NT
 
     std::vector<std::string> ReadHiddenKeys()
     {
-        const auto               path = IniPath();
-        const int                count = ReadInt("Hidden", "Count", 0, { 0, 10000 }, path);
         std::vector<std::string> keys;
-        for (int i = 1; i <= count; ++i) {
-            if (auto key = NT::Text::PercentUnescape(ReadString("Hidden", std::format("Line{}", i).c_str(), "", path)); !key.empty()) {
-                keys.push_back(std::move(key));
-            }
-        }
+        ReadKeySection("Hidden", IniPath(), [&](int, std::string a_key) { keys.push_back(std::move(a_key)); });
         logs::info("{} hidden line(s) loaded", keys.size());
         return keys;
     }
@@ -289,15 +295,16 @@ namespace NT
     std::map<std::string, float> ReadDurations()
     {
         const auto                   path = IniPath();
-        const int                    count = ReadInt("Durations", "Count", 0, { 0, 10000 }, path);
         std::map<std::string, float> durations;
-        for (int i = 1; i <= count; ++i) {
-            auto key = NT::Text::PercentUnescape(ReadString("Durations", std::format("Line{}", i).c_str(), "", path));
-            const float seconds = ReadFloat("Durations", std::format("Time{}", i).c_str(), NT::Settings{}.duration, Limits::kDuration, path);
-            if (!key.empty()) {
-                durations[std::move(key)] = seconds;
+        ReadKeySection("Durations", path, [&](int a_index, std::string a_key) {
+            // A line without a valid time is dropped, not given a default one.
+            const auto text = ReadString("Durations", std::format("Time{}", a_index).c_str(), "", path);
+            float      seconds = 0.0F;
+            if (const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), seconds);
+                !text.empty() && ec == std::errc{} && ptr == text.data() + text.size() && std::isfinite(seconds)) {
+                durations[std::move(a_key)] = std::clamp(seconds, Limits::kDuration.min, Limits::kDuration.max);
             }
-        }
+        });
         logs::info("{} own display time(s) loaded", durations.size());
         return durations;
     }
@@ -306,7 +313,7 @@ namespace NT
     {
         std::vector<KeyLine> lines;
         for (const auto& [key, seconds] : a_durations) {
-            lines.push_back({ key, std::format("{:.1f}", seconds) });
+            lines.push_back({ key, seconds });
         }
         WriteKeySection("Durations", lines);
     }

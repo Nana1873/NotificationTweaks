@@ -22,6 +22,7 @@ STRINGS = [
     ("historyShowAll", "Show all hidden again", "Alle ausgeblendeten wieder anzeigen"),
     ("historyTime", "Display time for this message (numbers match any number). Right-click: back to the general setting.", "Anzeigedauer für diese Meldung (Zahlen passen auf jede Zahl). Rechtsklick: zurück zur allgemeinen Einstellung."),
     ("historyTimeDefault", "Default", "Standard"),
+    ("historyTimeOff", "Own display times work while \"Replace Vanilla notifications\" is on.", "Eigene Anzeigedauern wirken, solange \"Vanilla-Benachrichtigungen ersetzen\" an ist."),
     ("headAdvanced", "Advanced", "Erweitert"),
     ("enabled", "Replace Vanilla notifications", "Vanilla-Benachrichtigungen ersetzen"),
     ("enabledTip", "Off: the Vanilla HUD shows notifications again.", "Aus: Das Vanilla-HUD zeigt die Benachrichtigungen wieder selbst an."),

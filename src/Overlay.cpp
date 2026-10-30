@@ -140,6 +140,11 @@ namespace
         return a_entry.duration.value_or(a_settings.duration);
     }
 
+    float Lifetime(const NT::Capture::Entry& a_entry, const NT::Settings& a_settings)
+    {
+        return a_settings.fadeIn + Duration(a_entry, a_settings) + a_settings.fadeOut;
+    }
+
     float Alpha(const NT::Capture::Entry& a_entry, const NT::Settings& a_settings)
     {
         if (!a_entry.started) {
@@ -226,9 +231,7 @@ namespace
                 }
             }
 
-            std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) {
-                return a_entry.started && a_entry.age >= a_settings.fadeIn + Duration(a_entry, a_settings) + a_settings.fadeOut;
-            });
+            std::erase_if(a_entries, [&](const NT::Capture::Entry& a_entry) { return a_entry.started && a_entry.age >= Lifetime(a_entry, a_settings); });
             for (const auto& entry : a_entries) {
                 if (entry.started && !entry.hidden) {
                     visible.push_back(entry);

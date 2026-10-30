@@ -348,37 +348,37 @@ namespace
         return drawn;
     }
 
-    // Own display time of a history line, at the right edge of its row.
-    // Always there (reachable with a gamepad too); dimmed while the line
-    // uses the general setting and its row is not hovered, so the lines
-    // with their own time stand out. Right-click goes back to the general
-    // setting.
-    constexpr float kDefaultTimeAlpha = 0.45F;
+    constexpr float kDefaultTimeAlpha = 0.45F;  // dimmed, still readable
+    constexpr float kTimeSliderEms = 5.0F;      // fits "30.0 s" and "Standard"
 
     float DurationSliderWidth()
     {
-        return ImGuiMCP::GetFontSize() * 5.0F;
+        return ImGuiMCP::GetFontSize() * kTimeSliderEms;
     }
 
-    void DurationSlider(const std::string& a_key, std::optional<float> a_own, bool a_disabled, bool a_dim, std::uint64_t a_id)
+    // Own display time of a history line, at the right edge of its row.
+    // Always there (reachable with a gamepad too); dimmed while the line
+    // uses the general setting, so lines with their own time stand out.
+    // Right-click goes back to the general setting. a_defaultLabel is the
+    // "Default" text, escaped for use as a format string.
+    void DurationSlider(const std::string& a_key, std::optional<float> a_own, bool a_hidden, bool a_dim, const std::string& a_defaultLabel,
+        std::uint64_t a_id)
     {
         const auto& t = NT::Translation::S();
-        float       value = a_own.value_or(NT::Config().duration);
-        // Without a "%" ImGui shows the format as plain text; escape any "%"
-        // a translation may contain.
-        std::string defaultLabel = t.historyTimeDefault;
-        for (std::size_t pos = 0; (pos = defaultLabel.find('%', pos)) != std::string::npos; pos += 2) {
-            defaultLabel.insert(pos, 1, '%');
-        }
-        ImGuiMCP::BeginDisabled(a_disabled);
+        // Like the eye: only acts on the plugin's own lines.
+        const bool enabled = NT::CaptureEnabled();
+        float      value = a_own.value_or(NT::Config().duration);
+        ImGuiMCP::BeginDisabled(a_hidden || !enabled);
         ImGuiMCP::PushStyleVar(ImGuiMCP::ImGuiStyleVar_Alpha, ImGuiMCP::GetStyle()->Alpha * (a_dim ? kDefaultTimeAlpha : 1.0F));
         // No vertical padding, like the eye (a SmallButton): a full-height
         // frame is taller than the row and overlaps the next one.
         ImGuiMCP::PushStyleVar(ImGuiMCP::ImGuiStyleVar_FramePadding, { ImGuiMCP::GetStyle()->FramePadding.x, 0.0F });
         ImGuiMCP::SetNextItemWidth(DurationSliderWidth());
         if (ImGuiMCP::SliderFloat(std::format("###time{}", a_id).c_str(), &value, NT::Limits::kDuration.min, NT::Limits::kDuration.max,
-                a_own ? "%.1f s" : defaultLabel.c_str(), kClamp)) {
-            NT::Capture::SetDuration(a_key, value);
+                a_own ? "%.1f s" : a_defaultLabel.c_str(), kClamp)) {
+            // Whole tenths, as saved: a click on "Default" (no format to round
+            // by) would otherwise keep e.g. 4.2378 s for this session.
+            NT::Capture::SetDuration(a_key, std::round(value * 10.0F) / 10.0F);
         }
         ImGuiMCP::PopStyleVar(2);
         if (ImGuiMCP::IsItemDeactivatedAfterEdit()) {
@@ -389,7 +389,7 @@ namespace
             NT::Capture::SaveDurations();
         }
         ImGuiMCP::EndDisabled();
-        Tooltip(t.historyTime);
+        Tooltip(!enabled ? t.historyTimeOff : t.historyTime);
     }
 
     // One history row without its slider: eye (or a spacer for a line that
@@ -425,6 +425,34 @@ namespace
         ImGuiMCP::PopStyleColor();
     }
 
+    // A history row plus its display time slider, which goes back up onto
+    // the row's first line at a_sliderX (window-local x).
+    void RenderHistoryLine(const NT::Capture::HistoryEntry& a_entry, const std::set<std::string>& a_hidden,
+        const std::map<std::string, float>& a_durations, float a_sliderX, const std::string& a_defaultLabel)
+    {
+        const auto key = NT::Markup::LineHideKey(a_entry.text, a_entry.icons);
+        const bool hidden = !key.empty() && a_hidden.contains(key);
+        const auto rowStart = ImGuiMCP::GetCursorPos();
+        const auto rowStartScreen = ImGuiMCP::GetCursorScreenPos();
+        const float rowWidth = ImGuiMCP::GetContentRegionAvail().x;
+        RenderHistoryRow(a_entry, key, hidden);
+        if (key.empty()) {
+            return;  // nothing to key a time on
+        }
+        const auto rowEnd = ImGuiMCP::GetCursorPos();
+        const auto found = a_durations.find(key);
+        const auto own = found != a_durations.end() ? std::optional{ found->second } : std::nullopt;
+        // Hover over the whole row, from its start to the right edge of the list.
+        const bool hovered = ImGuiMCP::IsMouseHoveringRect(rowStartScreen,
+            { rowStartScreen.x + rowWidth, rowStartScreen.y + (rowEnd.y - rowStart.y) });
+        ImGuiMCP::SetCursorPos({ a_sliderX, rowStart.y });
+        DurationSlider(key, own, hidden, !own && !hovered, a_defaultLabel, a_entry.id);
+        // Back down to where the row ended, through an item: a bare
+        // SetCursorPos before EndChild trips ImGui's boundary check.
+        ImGuiMCP::SetCursorPosY(rowEnd.y - ImGuiMCP::GetStyle()->ItemSpacing.y);
+        ImGuiMCP::Dummy({ 0.0F, 0.0F });
+    }
+
     // Page "History": the session's notifications, newest first, in their
     // own color; merged halves appear as the one line they became. Hidden
     // lines are grey with a closed eye.
@@ -433,6 +461,11 @@ namespace
         const auto& t = NT::Translation::S();
         static char filter[128]{};
 
+        // A slider edit whose row vanished (history full, filter, menu
+        // closed) never got its release; write it once nothing is dragged.
+        if (!ImGuiMCP::IsAnyItemActive()) {
+            NT::Capture::SaveDurationsIfChanged();
+        }
         const auto hidden = NT::Capture::HiddenKeys();
         const auto durations = NT::Capture::Durations();
 
@@ -466,28 +499,14 @@ namespace
             NT::Capture::VisitHistory([&](const std::deque<NT::Capture::HistoryEntry>& a_history) { history = a_history; });
             // Text wraps before the slider column at the right edge.
             const float sliderX = ImGuiMCP::GetWindowContentRegionMax().x - DurationSliderWidth();
+            const auto  defaultLabel = NT::Text::EscapeFormat(t.historyTimeDefault);
             ImGuiMCP::PushTextWrapPos(sliderX - ImGuiMCP::GetStyle()->ItemSpacing.x);
             for (auto it = history.rbegin(); it != history.rend(); ++it) {
                 if (!needle.empty() && NT::Text::Lower(it->text).find(needle) == std::string::npos) {
                     continue;
                 }
                 any = true;
-                const auto key = NT::Markup::LineHideKey(it->text, it->icons);
-                const bool isHidden = !key.empty() && hidden.contains(key);
-                const auto rowStart = ImGuiMCP::GetCursorPos();
-                const auto rowStartScreen = ImGuiMCP::GetCursorScreenPos();
-                RenderHistoryRow(*it, key, isHidden);
-                if (key.empty()) {
-                    continue;
-                }
-                // The slider goes back up onto the row's first line.
-                const auto rowEnd = ImGuiMCP::GetCursorPos();
-                const auto own = durations.contains(key) ? std::optional{ durations.at(key) } : std::nullopt;
-                const bool hovered = ImGuiMCP::IsMouseHoveringRect(rowStartScreen,
-                    { rowStartScreen.x + ImGuiMCP::GetWindowContentRegionMax().x, rowStartScreen.y + (rowEnd.y - rowStart.y) });
-                ImGuiMCP::SetCursorPos({ sliderX, rowStart.y });
-                DurationSlider(key, own, isHidden || !NT::CaptureEnabled(), !own && !hovered, it->id);
-                ImGuiMCP::SetCursorPos(rowEnd);
+                RenderHistoryLine(*it, hidden, durations, sliderX, defaultLabel);
             }
             ImGuiMCP::PopTextWrapPos();
             if (!any) {
@@ -501,6 +520,9 @@ namespace
     // through Done.
     void __stdcall OnMenuEvent(SKSEMenuFramework::Model::EventType a_type)
     {
+        if (a_type == SKSEMenuFramework::Model::kCloseMenu) {
+            NT::Capture::SaveDurationsIfChanged();
+        }
         if (a_type == SKSEMenuFramework::Model::kCloseMenu && NT::Overlay::IsPositioning() && g_positionWindow && !g_positionWindow->IsOpen) {
             NT::Overlay::SetPositioning(false);
             NT::SaveSettings();

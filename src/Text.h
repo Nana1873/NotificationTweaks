@@ -141,6 +141,20 @@ namespace NT::Text
         return out;
     }
 
+    // Doubles every '%', so a translated text can be an ImGui format string
+    // that shows as plain text.
+    inline std::string EscapeFormat(std::string_view a_text)
+    {
+        std::string out;
+        for (const char c : a_text) {
+            out += c;
+            if (c == '%') {
+                out += '%';
+            }
+        }
+        return out;
+    }
+
     // Reverses PercentEscape; a '%' without two hex digits stays as it is.
     inline std::string PercentUnescape(std::string_view a_text)
     {

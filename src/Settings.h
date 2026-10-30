@@ -103,7 +103,7 @@ namespace NT
         bool  mergeBos = true;
         bool  mergeGeneric = false;
         float mergeWindow = 0.35F;
-        float visibleTime = 4.15F;  // fadeIn + duration: how long a line counts for stacking
+        float duration = 4.0F;  // general display time; a line's own time replaces it (stacking window)
         float fadeIn = 0.15F;
         int   ypsLimit = 80;
         bool  drawIconFonts = true;
@@ -129,7 +129,8 @@ namespace NT
     std::vector<std::string> ReadHiddenKeys();
     void                     WriteHiddenKeys(const std::vector<std::string>& a_keys);
 
-    // [Durations]: own display time per hide key, set on the History page.
+    // [Durations]: own display time per hide key, set on the History page;
+    // same format as [Hidden] plus TimeN (seconds).
     std::map<std::string, float> ReadDurations();
     void                         WriteDurations(const std::map<std::string, float>& a_durations);
 }
