@@ -1,7 +1,6 @@
 #include "MenuIntegration.h"
 
 #include "Capture.h"
-#include "CenterNotifications.h"
 #include "IconFont.h"
 #include "Merge.h"
 #include "Overlay.h"
@@ -25,10 +24,6 @@ namespace
 
     SKSEMenuFramework::Model::WindowInterface* g_positionWindow = nullptr;
 
-    // The editor window pauses the game, which freezes a preview popup's
-    // animation; the pause is lifted until this ImGui time after a preview.
-    constexpr double kPreviewSeconds = 5.0;
-    double           g_previewUntil = 0.0;
 
     // Ctrl+Click lets the player type a value; keep it inside the range.
     constexpr auto kClamp = ImGuiMCP::ImGuiSliderFlags_AlwaysClamp;
@@ -126,25 +121,8 @@ namespace
         }
     }
 
-    // One row of buttons: a sample popup per center group at its place.
-    void RenderPreviewButtons()
-    {
-        const auto&        t = NT::Translation::S();
-        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
-        ImGuiMCP::TextUnformatted(t.centerPreview.c_str());
-        Tooltip(t.centerPreviewTip);
-        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
-            ImGuiMCP::SameLine();
-            if (ImGuiMCP::SmallButton((*names[i] + "##cpreview" + std::to_string(i)).c_str())) {
-                NT::CenterNotifications::Preview(static_cast<NT::CenterGroup>(i), *names[i]);
-                g_previewUntil = ImGuiMCP::GetTime() + kPreviewSeconds;
-            }
-            Tooltip(t.centerPreviewTip);
-        }
-    }
-
-    // Small window of the layout editor: hint, fine sliders for the lines,
-    // previews of the center notifications and Done.
+    // Small window of the layout editor: hint, fine sliders for the lines
+    // and Done.
     void __stdcall RenderPositionWindow()
     {
         const auto& t = NT::Translation::S();
@@ -161,10 +139,6 @@ namespace
             if (Combo(t.align, "##palign", align, { &t.alignLeft, &t.alignCenter, &t.alignRight })) {
                 s.align = static_cast<NT::Align>(align);
                 NT::SaveSettings();
-            }
-            RenderPreviewButtons();
-            if (g_positionWindow) {
-                g_positionWindow->BlockUserInput = ImGuiMCP::GetTime() >= g_previewUntil;
             }
             if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
                 open = false;

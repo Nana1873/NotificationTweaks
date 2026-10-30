@@ -11,8 +11,6 @@ namespace
     std::optional<RE::HUD_MESSAGE_TYPE>      g_frontBefore;
     std::chrono::steady_clock::time_point    g_lastMeasure;
 
-    // A queued preview: the next location-style entry uses this group (+1, 0 = none).
-    std::atomic<int> g_previewGroup{ 0 };
 
     std::mutex                             g_geometryLock;
     NT::CenterNotifications::Geometry      g_geometry;
@@ -127,11 +125,7 @@ namespace NT::CenterNotifications
         }
         // The front entry left the queue: Vanilla started showing it.
         if (a_this->queue.size() < g_sizeBefore && g_frontBefore) {
-            auto group = GroupOf(*g_frontBefore);
-            if (const int preview = g_previewGroup.exchange(0); preview > 0 && group == CenterGroup::kLocation) {
-                group = static_cast<CenterGroup>(preview - 1);
-            }
-            Apply(root, group);
+            Apply(root, GroupOf(*g_frontBefore));
         }
         // A changed placement (menu, drag) reaches the next entry; the HUD
         // geometry is measured about once a second for the drag frames.
@@ -145,20 +139,6 @@ namespace NT::CenterNotifications
     {
         std::scoped_lock lock{ g_geometryLock };
         return g_geometry;
-    }
-
-    void Preview(CenterGroup a_group, std::string a_text)
-    {
-        SKSE::GetTaskInterface()->AddTask([a_group, text = std::move(a_text)]() {
-            auto* queue = RE::UIMessageQueue::GetSingleton();
-            auto* strings = RE::InterfaceStrings::GetSingleton();
-            if (auto* data = static_cast<RE::HUDData*>(queue->CreateUIMessageData(strings->hudData))) {
-                g_previewGroup = static_cast<int>(a_group) + 1;
-                data->type = RE::HUD_MESSAGE_TYPE::kLocationDiscovery;
-                data->text = text.c_str();
-                queue->AddMessage(strings->hudMenu, RE::UI_MESSAGE_TYPE::kUpdate, data);
-            }
-        });
     }
 
     bool HandleDebugMessage(std::string_view a_text)

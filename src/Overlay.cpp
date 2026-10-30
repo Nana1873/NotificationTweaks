@@ -487,7 +487,7 @@ namespace
         }
 
         // A dark title bar hides the labels of the boxes below, so only the top
-        // one reads; the inside stays see-through for a preview popup.
+        // one reads; the inside stays see-through, so the HUD shows through.
         const float barHeight = ImGuiMCP::GetTextLineHeight() + 8.0F;
         for (const auto i : kDrawOrder) {
             const auto& [min, max] = boxes[i];

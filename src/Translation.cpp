@@ -176,8 +176,6 @@ namespace NT::Translation
         g_strings.centerQuest = Translate("$NT_CenterQuest", defaults.centerQuest);
         g_strings.centerSkill = Translate("$NT_CenterSkill", defaults.centerSkill);
         g_strings.centerShout = Translate("$NT_CenterShout", defaults.centerShout);
-        g_strings.centerPreview = Translate("$NT_CenterPreview", defaults.centerPreview);
-        g_strings.centerPreviewTip = Translate("$NT_CenterPreviewTip", defaults.centerPreviewTip);
         g_strings.posX = Translate("$NT_PosX", defaults.posX);
         g_strings.posY = Translate("$NT_PosY", defaults.posY);
         g_strings.align = Translate("$NT_Align", defaults.align);

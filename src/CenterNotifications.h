@@ -34,10 +34,6 @@ namespace NT::CenterNotifications
     };
     Geometry GetGeometry();
 
-    // Any thread: shows a sample popup (Vanilla location style, a_text) with
-    // a_group's placement, queued like any other center notification.
-    void Preview(CenterGroup a_group, std::string a_text);
-
     // Test hook (VerboseLog only): a notification "NTDEBUG:<type>:<text>"
     // becomes a HUD message of that HUD_MESSAGE_TYPE, sent the way Dynamic
     // Location Pop-ups sends its popups. True when it was one.
