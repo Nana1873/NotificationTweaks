@@ -28,10 +28,14 @@ namespace
         c.fadeIn = s.fadeIn;
         c.ypsLimit = s.ypsLimit;
         c.drawIconFonts = s.drawIconFonts;
+        c.center = s.center;
         std::scoped_lock lock{ g_captureLock };
         g_capture = c;
         g_captureEnabled = c.enabled;
     }
+
+    // INI key prefix per CenterGroup.
+    constexpr const char* kCenterKeys[NT::kCenterGroups] = { "Location", "Quest", "Skill", "Shout" };
 
     std::string IniPath()
     {
@@ -198,6 +202,14 @@ namespace NT
         s.ypsLimit = ReadInt("Compatibility", "YPSLimit", d.ypsLimit, Limits::kYpsLimit, path);
         s.drawIconFonts = ReadBool("Compatibility", "DrawIconFonts", d.drawIconFonts, path);
 
+        for (std::size_t i = 0; i < kCenterGroups; ++i) {
+            const std::string key = kCenterKeys[i];
+            auto&             c = s.center[i];
+            c.x = ReadFloat("CenterNotifications", (key + "X").c_str(), 0.0F, Limits::kCenterX, path);
+            c.y = ReadFloat("CenterNotifications", (key + "Y").c_str(), 0.0F, Limits::kCenterY, path);
+            c.scale = ReadFloat("CenterNotifications", (key + "Scale").c_str(), 1.0F, Limits::kCenterScale, path);
+        }
+
         PublishCapture();
         logs::info("Settings loaded from {} (enabled {}, pos {:.3f}/{:.3f}, immediate {}, merge YPS {} BoS {} generic {}, icon fonts {})",
             path, s.enabled, s.posX, s.posY, s.immediate, s.mergeYps, s.mergeBos, s.mergeGeneric, s.drawIconFonts);
@@ -248,6 +260,14 @@ namespace NT
         Write("Compatibility", "MergeWindow", f(s.mergeWindow), path);
         Write("Compatibility", "YPSLimit", std::to_string(s.ypsLimit), path);
         Write("Compatibility", "DrawIconFonts", b(s.drawIconFonts), path);
+
+        for (std::size_t i = 0; i < kCenterGroups; ++i) {
+            const std::string key = kCenterKeys[i];
+            const auto&       c = s.center[i];
+            Write("CenterNotifications", (key + "X").c_str(), f(c.x), path);
+            Write("CenterNotifications", (key + "Y").c_str(), f(c.y), path);
+            Write("CenterNotifications", (key + "Scale").c_str(), f(c.scale), path);
+        }
         PublishCapture();
     }
 

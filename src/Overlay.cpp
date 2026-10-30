@@ -1,6 +1,7 @@
 #include "Overlay.h"
 
 #include "Capture.h"
+#include "CenterNotifications.h"
 #include "IconFont.h"
 #include "SKSEMenuFramework.h"
 #include "Settings.h"
@@ -16,8 +17,17 @@ namespace
     constexpr float kDragPadding = 6.0F;
 
     std::atomic<bool> g_positioning{ false };
-    bool              g_dragging = false;
     ImVec2            g_grabOffset{ 0.0F, 0.0F };
+
+    // What the mouse holds in the positioning mode.
+    enum class DragTarget
+    {
+        kNone,
+        kLines,
+        kCenter
+    };
+    DragTarget       g_dragTarget = DragTarget::kNone;
+    std::atomic<int> g_centerSelection{ 0 };  // see Overlay::SetCenterSelection
 
     struct Piece
     {
@@ -369,25 +379,100 @@ namespace
         const bool   inside = mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y;
         const bool   overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
 
-        if (!g_dragging && inside && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
-            g_dragging = true;
+        if (g_dragTarget == DragTarget::kNone && inside && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
+            g_dragTarget = DragTarget::kLines;
             g_grabOffset = { mouse.x - a_anchor.x, mouse.y - a_anchor.y };
         }
-        if (g_dragging) {
+        const bool dragging = g_dragTarget == DragTarget::kLines;
+        if (dragging) {
             if (ImGuiMCP::IsMouseDown(0)) {
                 a_settings.posX = std::clamp((mouse.x - g_grabOffset.x) / a_screen.x, 0.0F, 1.0F);
                 a_settings.posY = std::clamp((mouse.y - g_grabOffset.y) / a_screen.y, 0.0F, 1.0F);
             } else {
-                g_dragging = false;
+                g_dragTarget = DragTarget::kNone;
                 NT::SaveSettings();
                 logs::info("Position set by dragging: {:.4f} / {:.4f}", a_settings.posX, a_settings.posY);
             }
         }
 
-        const bool active = g_dragging || (inside && !overWindow);
+        const bool active = dragging || (inside && !overWindow && g_dragTarget == DragTarget::kNone);
         const auto frame = ImGuiMCP::ColorConvertFloat4ToU32({ 1.0F, 0.85F, 0.3F, active ? 1.0F : 0.6F });
         ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, frame, 4.0F, 0, active ? 2.5F : 1.5F);
         ImGuiMCP::ImDrawListManager::AddCircleFilled(a_list, a_anchor, 4.0F, frame, 12);
+    }
+
+    // Screen rect of a center group's text area at its placement.
+    std::pair<ImVec2, ImVec2> CenterFrame(const NT::CenterNotifications::Geometry& a_geometry, const NT::CenterPlacement& a_place)
+    {
+        using namespace NT::CenterNotifications;
+        const float unit = a_geometry.pxPerUnit;
+        const float cx = a_geometry.originX + a_place.x * unit;
+        const float cy = a_geometry.originY + (a_place.y + kTextOffsetY * a_place.scale) * unit;
+        const float halfW = kFrameWidth * 0.5F * a_place.scale * unit;
+        const float halfH = kFrameHeight * 0.5F * a_place.scale * unit;
+        return { { cx - halfW, cy - halfH }, { cx + halfW, cy + halfH } };
+    }
+
+    // Positioning mode: a labelled frame per center group (where its title
+    // line shows). The selected group, or all of them together, follows a
+    // left-button drag; saved on release.
+    void HandleCenterDrag(ImGuiMCP::ImDrawList* a_list, NT::Settings& a_settings)
+    {
+        const auto geometry = NT::CenterNotifications::GetGeometry();
+        if (!geometry.valid) {
+            return;
+        }
+        const auto&       t = NT::Translation::S();
+        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
+        const int         selection = g_centerSelection.load();
+        const auto        selected = [&](std::size_t a_group) { return selection == 0 || selection == static_cast<int>(a_group) + 1; };
+        const auto        mouse = ImGuiMCP::GetMousePos();
+        const bool        overWindow = ImGuiMCP::IsWindowHovered(ImGuiMCP::ImGuiHoveredFlags_AnyWindow);
+
+        bool hovered = false;
+        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
+            const auto [min, max] = CenterFrame(geometry, a_settings.center[i]);
+            if (selected(i) && mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) {
+                hovered = true;
+            }
+        }
+        if (g_dragTarget == DragTarget::kNone && hovered && !overWindow && ImGuiMCP::IsMouseClicked(0)) {
+            g_dragTarget = DragTarget::kCenter;
+            g_grabOffset = mouse;
+        }
+        const bool dragging = g_dragTarget == DragTarget::kCenter;
+        if (dragging) {
+            if (ImGuiMCP::IsMouseDown(0)) {
+                // Move every selected group by the mouse delta, in HUD units.
+                const float dx = (mouse.x - g_grabOffset.x) / geometry.pxPerUnit;
+                const float dy = (mouse.y - g_grabOffset.y) / geometry.pxPerUnit;
+                g_grabOffset = mouse;
+                for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
+                    if (selected(i)) {
+                        auto& place = a_settings.center[i];
+                        place.x = std::clamp(place.x + dx, NT::Limits::kCenterX.min, NT::Limits::kCenterX.max);
+                        place.y = std::clamp(place.y + dy, NT::Limits::kCenterY.min, NT::Limits::kCenterY.max);
+                    }
+                }
+            } else {
+                g_dragTarget = DragTarget::kNone;
+                NT::SaveSettings();
+                logs::info("Center notifications moved by dragging");
+            }
+        }
+
+        // Unselected groups dimmed; labels stacked so frames on the same spot
+        // (the default) stay readable.
+        const float lineHeight = ImGuiMCP::GetTextLineHeight();
+        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
+            const auto [min, max] = CenterFrame(geometry, a_settings.center[i]);
+            const bool  active = selected(i) && (dragging || (hovered && !overWindow && g_dragTarget == DragTarget::kNone));
+            const float alpha = !selected(i) ? 0.3F : active ? 1.0F : 0.6F;
+            const auto  color = ImGuiMCP::ColorConvertFloat4ToU32({ 0.45F, 0.8F, 1.0F, alpha });
+            ImGuiMCP::ImDrawListManager::AddRect(a_list, min, max, color, 4.0F, 0, active ? 2.5F : 1.5F);
+            const ImVec2 label{ min.x + 6.0F, min.y + 4.0F + static_cast<float>(i) * lineHeight };
+            ImGuiMCP::ImDrawListManager::AddText(a_list, label, color, names[i]->c_str(), nullptr);
+        }
     }
 
     void __stdcall Render()
@@ -430,8 +515,9 @@ namespace
 
         if (positioning) {
             HandleDrag(list, blocks, anchor, screen, metrics, s);
+            HandleCenterDrag(list, s);
         } else {
-            g_dragging = false;
+            g_dragTarget = DragTarget::kNone;
         }
     }
 }
@@ -448,8 +534,18 @@ namespace NT::Overlay
     {
         g_positioning = a_on;
         if (!a_on) {
-            g_dragging = false;
+            g_dragTarget = DragTarget::kNone;
         }
+    }
+
+    void SetCenterSelection(int a_selection)
+    {
+        g_centerSelection = std::clamp(a_selection, 0, static_cast<int>(NT::kCenterGroups));
+    }
+
+    int CenterSelection()
+    {
+        return g_centerSelection.load();
     }
 
     bool IsPositioning()

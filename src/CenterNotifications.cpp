@@ -1,88 +1,105 @@
 #include "CenterNotifications.h"
 
-#include "Settings.h"
-
 namespace
 {
-    using NT::CenterNotifications::Group;
+    using NT::CenterGroup;
 
-    struct Placement
-    {
-        double x = 0.0;      // offset from the Vanilla position, stage pixels
-        double y = 0.0;
-        double scale = 100.0;  // percent of the Vanilla scale
-    };
+    // Game thread only.
+    std::optional<RE::GFxValue::DisplayInfo> g_base;  // Vanilla position and scale of the clip, read once
+    std::optional<CenterGroup>               g_applied;  // placement currently set, none = Vanilla
+    std::size_t                              g_sizeBefore = 0;
+    std::optional<RE::HUD_MESSAGE_TYPE>      g_frontBefore;
+    std::chrono::steady_clock::time_point    g_lastMeasure;
 
-    std::array<Placement, static_cast<std::size_t>(Group::kCount)> g_placements;
+    // A queued preview: the next location-style entry uses this group (+1, 0 = none).
+    std::atomic<int> g_previewGroup{ 0 };
 
-    // Vanilla position and scale of the clip, read once.
-    std::optional<RE::GFxValue::DisplayInfo> g_base;
+    std::mutex                             g_geometryLock;
+    NT::CenterNotifications::Geometry      g_geometry;
 
-    // Queue state before the Vanilla update.
-    std::size_t                          g_sizeBefore = 0;
-    std::optional<RE::HUD_MESSAGE_TYPE>  g_frontBefore;
-    std::optional<Group>                 g_applied;
-
-    std::optional<Group> GroupOf(RE::HUD_MESSAGE_TYPE a_type)
+    std::optional<CenterGroup> GroupOf(RE::HUD_MESSAGE_TYPE a_type)
     {
         using T = RE::HUD_MESSAGE_TYPE;
         switch (a_type) {
         case T::kLocationDiscovery:
-            return Group::kLocation;
+            return CenterGroup::kLocation;
         case T::kQuestStarted:
         case T::kQuestComplete:
         case T::kQuestFailed:
         case T::kObjectiveStarted:
         case T::kObjectiveComplete:
         case T::kObjectiveFailed:
-            return Group::kQuest;
+            return CenterGroup::kQuest;
         case T::kSkillIncrease:
-            return Group::kSkill;
+            return CenterGroup::kSkill;
         case T::kWordOfPowerLearned:
         case T::kDragonSoulAbsorbed:
-            return Group::kShout;
+            return CenterGroup::kShout;
         default:
             return std::nullopt;
         }
     }
 
-    const char* GroupName(Group a_group)
+    RE::GPtr<RE::GFxMovieView> HudMovie()
     {
-        switch (a_group) {
-        case Group::kLocation:
-            return "Location";
-        case Group::kQuest:
-            return "Quest";
-        case Group::kSkill:
-            return "Skill";
-        case Group::kShout:
-            return "Shout";
-        default:
-            return "?";
-        }
+        auto* ui = RE::UI::GetSingleton();
+        auto  hud = ui ? ui->GetMenu(RE::HUDMenu::MENU_NAME) : nullptr;
+        return hud ? hud->uiMovie : nullptr;
     }
 
-    void Apply(RE::GFxValue& a_root, Group a_group)
+    // Sets the clip to a_group's placement, or back to Vanilla for none.
+    void Apply(RE::GFxValue& a_root, std::optional<CenterGroup> a_group)
     {
-        if (!a_root.IsDisplayObject()) {
-            return;
+        if (!g_base || (!a_group && !g_applied)) {
+            return;  // re-applied for every entry of a group, so a changed placement shows at once
         }
-        if (!g_base) {
-            RE::GFxValue::DisplayInfo info;
-            if (!a_root.GetDisplayInfo(&info)) {
-                return;
-            }
-            g_base = info;
-            logs::debug("Center notifications: Vanilla clip at {:.1f}, {:.1f}, scale {:.1f}/{:.1f}", info.GetX(), info.GetY(),
-                info.GetXScale(), info.GetYScale());
-        }
-        const auto&                p = g_placements[static_cast<std::size_t>(a_group)];
+        const auto                p = a_group ? NT::CaptureConfig().center[static_cast<std::size_t>(*a_group)] : NT::CenterPlacement{};
         RE::GFxValue::DisplayInfo info;
         info.SetPosition(g_base->GetX() + p.x, g_base->GetY() + p.y);
-        info.SetScale(g_base->GetXScale() * p.scale / 100.0, g_base->GetYScale() * p.scale / 100.0);
+        info.SetScale(g_base->GetXScale() * p.scale, g_base->GetYScale() * p.scale);
         a_root.SetDisplayInfo(info);
         g_applied = a_group;
-        logs::debug("Center notifications: {} placement {:+.0f}, {:+.0f}, {:.0f}%", GroupName(a_group), p.x, p.y, p.scale);
+    }
+
+    // Clip origin (Vanilla spot) and one HUD unit in screen pixels, through
+    // the parent's localToGlobal and the movie's visible frame.
+    void Measure(RE::GFxValue& a_root)
+    {
+        const auto movie = HudMovie();
+        if (!movie || !g_base) {
+            return;
+        }
+        RE::GFxValue parent;
+        if (!a_root.GetMember("_parent", &parent) || !parent.IsDisplayObject()) {
+            return;
+        }
+        const auto     rect = movie->GetVisibleFrameRect();
+        RE::GViewport  viewport;
+        movie->GetViewport(&viewport);
+        if (rect.right <= rect.left || rect.bottom <= rect.top) {
+            return;
+        }
+        const auto toScreen = [&](double a_x, double a_y) {
+            RE::GFxValue point;
+            movie->CreateObject(&point);
+            point.SetMember("x", RE::GFxValue(a_x));
+            point.SetMember("y", RE::GFxValue(a_y));
+            parent.Invoke("localToGlobal", nullptr, &point, 1);
+            RE::GFxValue x, y;
+            point.GetMember("x", &x);
+            point.GetMember("y", &y);
+            return std::pair{ viewport.left + (x.GetNumber() - rect.left) * viewport.width / (rect.right - rect.left),
+                viewport.top + (y.GetNumber() - rect.top) * viewport.height / (rect.bottom - rect.top) };
+        };
+        const auto [x0, y0] = toScreen(g_base->GetX(), g_base->GetY());
+        const auto [x1, y1] = toScreen(g_base->GetX() + 100.0, g_base->GetY());
+        NT::CenterNotifications::Geometry geometry;
+        geometry.valid = x1 > x0;
+        geometry.originX = static_cast<float>(x0);
+        geometry.originY = static_cast<float>(y0);
+        geometry.pxPerUnit = static_cast<float>((x1 - x0) / 100.0);
+        std::scoped_lock lock{ g_geometryLock };
+        g_geometry = geometry;
     }
 }
 
@@ -96,36 +113,51 @@ namespace NT::CenterNotifications
 
     void AfterUpdate(RE::HUDNotifications* a_this)
     {
-        const auto size = a_this->queue.size();
-        if (size != g_sizeBefore) {
-            logs::debug("Center notifications: queue {} -> {}, front was {}", g_sizeBefore, size,
-                g_frontBefore ? std::to_underlying(*g_frontBefore) : -1);
+        auto& root = a_this->root;
+        if (!root.IsDisplayObject()) {
+            return;
+        }
+        if (!g_base) {
+            RE::GFxValue::DisplayInfo info;
+            if (!root.GetDisplayInfo(&info)) {
+                return;
+            }
+            g_base = info;
         }
         // The front entry left the queue: Vanilla started showing it.
-        if (size < g_sizeBefore && g_frontBefore) {
-            if (const auto group = GroupOf(*g_frontBefore)) {
-                Apply(a_this->root, *group);
+        if (a_this->queue.size() < g_sizeBefore && g_frontBefore) {
+            auto group = GroupOf(*g_frontBefore);
+            if (const int preview = g_previewGroup.exchange(0); preview > 0 && group == CenterGroup::kLocation) {
+                group = static_cast<CenterGroup>(preview - 1);
             }
+            Apply(root, group);
+        }
+        // A changed placement (menu, drag) reaches the next entry; the HUD
+        // geometry is measured about once a second for the drag frames.
+        if (const auto now = std::chrono::steady_clock::now(); now - g_lastMeasure > std::chrono::seconds(1)) {
+            g_lastMeasure = now;
+            Measure(root);
         }
     }
 
-    void LoadSettings()
+    Geometry GetGeometry()
     {
-        const auto path = std::filesystem::absolute("Data/SKSE/Plugins/NotificationTweaks.ini").string();
-        const auto read = [&](const char* a_key, double a_default) {
-            char buf[64]{};
-            GetPrivateProfileStringA("CenterNotifications", a_key, "", buf, sizeof(buf), path.c_str());
-            double     value = a_default;
-            const auto end = buf + std::strlen(buf);
-            if (std::from_chars(buf, end, value).ptr != end || buf == end) {
-                value = a_default;
+        std::scoped_lock lock{ g_geometryLock };
+        return g_geometry;
+    }
+
+    void Preview(CenterGroup a_group, std::string a_text)
+    {
+        SKSE::GetTaskInterface()->AddTask([a_group, text = std::move(a_text)]() {
+            auto* queue = RE::UIMessageQueue::GetSingleton();
+            auto* strings = RE::InterfaceStrings::GetSingleton();
+            if (auto* data = static_cast<RE::HUDData*>(queue->CreateUIMessageData(strings->hudData))) {
+                g_previewGroup = static_cast<int>(a_group) + 1;
+                data->type = RE::HUD_MESSAGE_TYPE::kLocationDiscovery;
+                data->text = text.c_str();
+                queue->AddMessage(strings->hudMenu, RE::UI_MESSAGE_TYPE::kUpdate, data);
             }
-            return value;
-        };
-        for (std::size_t i = 0; i < g_placements.size(); ++i) {
-            const std::string name = GroupName(static_cast<Group>(i));
-            g_placements[i] = { read((name + "X").c_str(), 0.0), read((name + "Y").c_str(), 0.0), read((name + "Scale").c_str(), 100.0) };
-        }
+        });
     }
 
     bool HandleDebugMessage(std::string_view a_text)
@@ -147,7 +179,7 @@ namespace NT::CenterNotifications
             data->type = static_cast<RE::HUD_MESSAGE_TYPE>(type);
             data->text = text.c_str();
             queue->AddMessage(strings->hudMenu, RE::UI_MESSAGE_TYPE::kUpdate, data);
-            logs::debug("Debug HUD message type {}: {}", type, text);
+            logs::debug("Test HUD message type {}: {}", type, text);
         }
         return true;
     }

@@ -42,7 +42,34 @@ namespace NT
         inline constexpr Range<float> kFadeOut{ 0.0F, 5.0F };
         inline constexpr Range<float> kMergeWindow{ 0.05F, 2.0F };
         inline constexpr Range<int>   kYpsLimit{ 30, 1000 };
+        // Center notifications: offset in HUD units (the HUD movie is 1280 x 720
+        // units at any resolution) and scale factor.
+        inline constexpr Range<float> kCenterX{ -640.0F, 640.0F };
+        inline constexpr Range<float> kCenterY{ -400.0F, 720.0F };
+        inline constexpr Range<float> kCenterScale{ 0.3F, 3.0F };
     }
+
+    // The big notifications in the middle of the screen, in the groups that
+    // can each get their own place. Order = INI key prefixes in Settings.cpp.
+    enum class CenterGroup : int
+    {
+        kLocation,
+        kQuest,
+        kSkill,
+        kShout,
+        kCount
+    };
+    inline constexpr std::size_t kCenterGroups = static_cast<std::size_t>(CenterGroup::kCount);
+
+    // Where a group shows, relative to the Vanilla spot and size.
+    struct CenterPlacement
+    {
+        float x = 0.0F;  // HUD units, + right
+        float y = 0.0F;  // HUD units, + down
+        float scale = 1.0F;
+
+        bool operator==(const CenterPlacement&) const = default;
+    };
 
     // Font size and line spacing are stored as pixels at this screen height.
     inline constexpr float kReferenceHeight = 1080.0F;
@@ -89,6 +116,9 @@ namespace NT
         float mergeWindow = 0.35F;  // seconds the second half may arrive after the first
         int   ypsLimit = 80;        // YPS LongThoughtLimit (MCM); only longer thoughts are split
         bool  drawIconFonts = true; // draw icon-font glyphs (Oblivion Interaction Icons) from the library fontconfig.txt maps the face to
+
+        // [CenterNotifications]
+        std::array<CenterPlacement, kCenterGroups> center{};
     };
 
     // The values the game thread reads while capturing. The menu and the
@@ -107,6 +137,7 @@ namespace NT
         float fadeIn = 0.15F;
         int   ypsLimit = 80;
         bool  drawIconFonts = true;
+        std::array<CenterPlacement, kCenterGroups> center{};
     };
 
     // Render thread (menu, overlay) and startup: the full settings.

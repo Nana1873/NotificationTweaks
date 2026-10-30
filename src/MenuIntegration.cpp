@@ -1,6 +1,7 @@
 #include "MenuIntegration.h"
 
 #include "Capture.h"
+#include "CenterNotifications.h"
 #include "IconFont.h"
 #include "Merge.h"
 #include "Overlay.h"
@@ -138,6 +139,10 @@ namespace
                 s.align = static_cast<NT::Align>(align);
                 NT::SaveSettings();
             }
+            int center = NT::Overlay::CenterSelection();
+            if (Combo(t.centerMove, "##pcenter", center, { &t.centerAll, &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout })) {
+                NT::Overlay::SetCenterSelection(center);
+            }
             if (ImGuiMCP::Button((t.done + "##posdone").c_str())) {
                 open = false;
             }
@@ -145,6 +150,41 @@ namespace
         ImGuiMCP::End();
         if (!open) {
             ClosePositioning();
+        }
+    }
+
+    // Center notifications: size, preview and reset per group; they move in
+    // the positioning mode.
+    void RenderCenter()
+    {
+        const auto& t = NT::Translation::S();
+        auto&       s = NT::Config();
+        ImGuiMCP::SeparatorText(t.headCenter.c_str());
+        ImGuiMCP::PushTextWrapPos(0.0F);
+        ImGuiMCP::TextDisabled("%s", t.centerHint.c_str());
+        ImGuiMCP::PopTextWrapPos();
+        const std::string* names[NT::kCenterGroups] = { &t.centerLocation, &t.centerQuest, &t.centerSkill, &t.centerShout };
+        for (std::size_t i = 0; i < NT::kCenterGroups; ++i) {
+            auto&       place = s.center[i];
+            const auto  id = std::to_string(i);
+            ImGuiMCP::TextUnformatted(names[i]->c_str());
+            float percent = place.scale * 100.0F;
+            if (ImGuiMCP::SliderFloat((t.centerSize + "##csize" + id).c_str(), &percent, NT::Limits::kCenterScale.min * 100.0F,
+                    NT::Limits::kCenterScale.max * 100.0F, "%.0f%%", kClamp)) {
+                place.scale = percent / 100.0F;
+            }
+            Commit();
+            if (ImGuiMCP::Button((t.centerPreview + "##cpreview" + id).c_str())) {
+                NT::CenterNotifications::Preview(static_cast<NT::CenterGroup>(i), *names[i]);
+            }
+            Tooltip(t.centerPreviewTip);
+            ImGuiMCP::SameLine();
+            ImGuiMCP::BeginDisabled(place == NT::CenterPlacement{});
+            if (ImGuiMCP::Button((t.centerReset + "##creset" + id).c_str())) {
+                place = {};
+                NT::SaveSettings();
+            }
+            ImGuiMCP::EndDisabled();
         }
     }
 
@@ -181,6 +221,8 @@ namespace
             s.align = static_cast<NT::Align>(align);
             NT::SaveSettings();
         }
+
+        RenderCenter();
 
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
