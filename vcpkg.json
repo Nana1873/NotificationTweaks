@@ -1,6 +1,6 @@
 {
   "name": "notificationtweaks",
-  "version-semver": "1.3.1",
+  "version-semver": "1.3.2",
   "builtin-baseline": "8528134bac3d39db8d36f4097755a97a1394e4dc",
   "dependencies": [
     "spdlog",
