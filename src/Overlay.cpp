@@ -308,7 +308,8 @@ namespace
 
     bool HudVisible(RE::UI* a_ui)
     {
-        if (a_ui->IsMenuOpen(RE::MainMenu::MENU_NAME) || a_ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME)) {
+        // IsShowingMenus: false while the console's TM hides all menus.
+        if (!a_ui->IsShowingMenus() || a_ui->IsMenuOpen(RE::MainMenu::MENU_NAME) || a_ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME)) {
             return false;
         }
         const auto hud = a_ui->GetMenu(RE::HUDMenu::MENU_NAME);

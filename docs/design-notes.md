@@ -12,24 +12,24 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   `HUDData` of type `kNotification` is one notification line. With the
   plugin enabled it is pushed to the overlay and the message is reported
   handled, so the Vanilla `HUDNotifications` queue (one line at a time,
-  the "delay") never sees it (except in the fallback below). Disabled, the
-  line is only recorded in the history and passed on.
+  the "delay") never sees it. Disabled, the line is only recorded in the
+  history and passed on.
 - Hook order and other mods (1.3.1): both hooks are written in
   `SKSEPlugin_Load` and stay inert until `Activate()` at `kDataLoaded`
   (only with SKSE Menu Framework present). In a vtable chain the hook
   written last runs first, so a mod hooking `HUDMenu::ProcessMessage`
   later wraps around ours: ChatBox (Nexus 169429) hooks at data load,
   calls its original (us) first and then reads the `HUDData` text, so it
-  gets every line while Vanilla does not. Fallback when a DLL hooked even
-  before us (the slot then points outside the game module, logged as
-  "already hooked by"): a taken line is passed on to that hook, and the
-  entry Vanilla adds to the HUD movie's queue
-  (`HUDMovieBaseInstance.MessagesInstance.MessageArray`, a plain AS array
-  of strings, shown on a later frame) is removed right after: the entry
-  the call added, whatever that mod made of the text. A HUD without that
-  array logs a warning once; lines may then show in Vanilla too. Vanilla
-  never routes these lines through `HUDNotifications::ProcessMessage` or
-  its native queue; both were tried.
+  gets every line while Vanilla does not. A DLL that hooked even before
+  us is only logged ("already hooked by") and does not see taken lines.
+- Removed in 1.3.2: 1.3.1 passed taken lines on to such an earlier hook
+  and then removed the entry Vanilla added to the HUD movie's queue
+  (`HUDMovieBaseInstance.MessagesInstance.MessageArray`). For at least
+  one user every notification then showed twice (Vanilla above ours), so
+  the removal does not hold on every setup (HUD replacers, or a hook
+  that shows the line some other way). Do not bring it back without a
+  way to verify it per setup. Vanilla never routes these lines through
+  `HUDNotifications::ProcessMessage` or its native queue; both were tried.
 - `HUDNotifications::Update` (vfunc 0x1) is a second net: plain
   notification entries (no quest, no word of power) are taken out of the
   queue before Vanilla shows them. In every test so far all lines came
@@ -123,7 +123,8 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   still there after the line has faded).
 - Layout editor without a gamepad path since 1.3.0: the position sliders
   were removed with the Layout page, so moving needs mouse and keyboard.
-- Hidden while the HUD movie is invisible, at the main menu and during
+- Hidden while the HUD movie is invisible, while TM hides the menus
+  (`UI::IsShowingMenus`, 1.3.2), at the main menu and during
   loading screens. With `ShowInMenus` off (default), lines wait while a
   full-screen menu is open and appear when it closes; those menus are detected by name because
   Skyrim Souls RE keeps them unpaused, so `GameIsPaused()` is false there.

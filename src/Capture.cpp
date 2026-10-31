@@ -256,47 +256,6 @@ namespace
     // set on the main thread at kDataLoaded, read by the hooks.
     std::atomic<bool> g_taking{ false };
 
-    // Fallback for a mod that hooked HUDMenu::ProcessMessage even before us:
-    // our "original" is that mod, not Vanilla, and a swallowed line would
-    // never reach it. Taken lines are then passed on, and the copy Vanilla
-    // queues in the HUD movie is taken out again. Written once at plugin
-    // load, before any HUD code runs.
-    bool g_passOn = false;
-
-    // Vanilla queues a notification line for the HUD movie in this AS array
-    // of strings and shows it on a later frame.
-    constexpr auto kHudMessageQueue = "_root.HUDMovieBaseInstance.MessagesInstance.MessageArray";
-
-    // Entries in the HUD movie's message queue; nullopt if a HUD replacer
-    // has no such queue (logged once).
-    std::optional<std::uint32_t> HudQueueSize(RE::IMenu* a_menu, RE::GFxValue& a_queue)
-    {
-        if (a_menu->uiMovie && a_menu->uiMovie->GetVariable(&a_queue, kHudMessageQueue) && a_queue.IsArray()) {
-            return a_queue.GetArraySize();
-        }
-        static bool logged = false;
-        if (!logged) {
-            logged = true;
-            logs::warn("The HUD has no {}; passed-on notifications may show in Vanilla too", kHudMessageQueue);
-        }
-        return std::nullopt;
-    }
-
-    // Passes a taken line on to the mod hooked before us; the entry Vanilla
-    // then adds to the HUD movie's queue (whatever that mod made of the
-    // text) is removed before it shows.
-    RE::UI_MESSAGE_RESULTS PassOn(RE::IMenu* a_menu, RE::UIMessage& a_message,
-        const REL::Relocation<RE::UI_MESSAGE_RESULTS(RE::IMenu*, RE::UIMessage&)>& a_previous)
-    {
-        RE::GFxValue queue;
-        const auto   before = HudQueueSize(a_menu, queue);
-        const auto   result = a_previous(a_menu, a_message);
-        if (before && HudQueueSize(a_menu, queue) == *before + 1) {
-            queue.RemoveElement(*before);
-        }
-        return result;
-    }
-
     // The module a code address belongs to; nullptr if none, e.g. a hook
     // stub in trampoline memory, which then counts as another mod.
     HMODULE ModuleOf(std::uintptr_t a_address)
@@ -319,8 +278,7 @@ namespace
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
     // the request to show a notification line. Swallowing it here keeps it
     // out of the Vanilla HUDNotifications queue (and its one-at-a-time delay).
-    // Inert until Activate(); with g_passOn a taken line is handed on
-    // instead (PassOn).
+    // Inert until Activate().
     struct ProcessMessageHook
     {
         static RE::UI_MESSAGE_RESULTS thunk(RE::IMenu* a_this, RE::UIMessage& a_message)
@@ -341,9 +299,6 @@ namespace
                     }
                     if (hasText && !Take(text)) {
                         return func(a_this, a_message);  // icons we cannot draw: Vanilla can
-                    }
-                    if (g_passOn && hasText) {
-                        return PassOn(a_this, a_message, func);
                     }
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
@@ -409,11 +364,11 @@ namespace NT::Capture
         REL::Relocation<std::uintptr_t> hudMenu{ RE::VTABLE_HUDMenu[0] };
         ProcessMessageHook::func = hudMenu.write_vfunc(0x4, ProcessMessageHook::thunk);
         // Inside the game's own module: Vanilla. Anywhere else: a mod that
-        // hooked first and expects to see the notifications.
-        const auto previous = ModuleOf(ProcessMessageHook::func.address());
-        g_passOn = previous != reinterpret_cast<HMODULE>(REL::Module::get().pointer());
-        if (g_passOn) {
-            logs::info("HUDMenu::ProcessMessage was already hooked by {}: notifications are passed on to it", ModuleName(previous));
+        // hooked even before us; it does not see the lines we take (passing
+        // them on would let Vanilla show them too, see design notes).
+        if (const auto previous = ModuleOf(ProcessMessageHook::func.address());
+            previous != reinterpret_cast<HMODULE>(REL::Module::get().pointer())) {
+            logs::info("HUDMenu::ProcessMessage was already hooked by {}; it does not see the notifications taken here", ModuleName(previous));
         }
 
         REL::Relocation<std::uintptr_t> notifications{ RE::VTABLE_HUDNotifications[0] };
