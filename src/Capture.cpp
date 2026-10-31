@@ -308,8 +308,7 @@ namespace
                 const auto& text = a_args[0];
                 if (text.IsString() && Intercept(text.GetString())) {
                     return true;
-                }
-                if (text.IsStringW() && Intercept(NT::Text::ToUtf8(text.GetStringW()).c_str())) {
+                } else if (text.IsStringW() && Intercept(NT::Text::ToUtf8(text.GetStringW()).c_str())) {
                     return true;
                 }
             }
@@ -324,9 +323,14 @@ namespace
     constexpr REL::RelocationID kInvokeId{ 80233, 82256 };          // GFxValue::ObjectInterface::Invoke
     constexpr std::size_t       kCallOffsetSE = 0x65E;
     constexpr std::size_t       kCallOffsetAE = 0x686;
-    constexpr std::size_t       kLeaBeforeCall = 0x15;  // lea r9, "ShowMessage" (7 bytes) + the argument setup
+    constexpr std::size_t       kLeaBeforeCall = 0x15;  // lea r9, "ShowMessage" + the argument setup
     constexpr std::uint8_t      kCallOpcode = 0xE8;
+    constexpr std::size_t       kCallLength = 5;   // E8 rel32
     constexpr std::uint8_t      kLeaR9[] = { 0x4C, 0x8D, 0x0D };  // lea r9, [rip+disp32]
+    constexpr std::size_t       kLeaLength = 7;    // kLeaR9 + disp32
+    // Runtimes whose Address Library was checked to have both IDs.
+    constexpr REL::Version      kCallSiteFirstVersion{ 1, 5, 3, 0 };
+    constexpr REL::Version      kCallSiteLastVersion{ 1, 7, 104, 0 };
     constexpr std::string_view  kMethod{ "ShowMessage", sizeof("ShowMessage") };  // with its terminator
 
     // The call site, checked before anything is written: a call to Invoke,
@@ -337,7 +341,7 @@ namespace
     std::uintptr_t FindShowMessageCall()
     {
         const auto version = REL::Module::get().version();
-        if (REL::Module::IsVR() || version < REL::Version{ 1, 5, 3, 0 } || version > REL::Version{ 1, 7, 104, 0 }) {
+        if (REL::Module::IsVR() || version < kCallSiteFirstVersion || version > kCallSiteLastVersion) {
             return 0;
         }
         const auto site = kProcessMessageId.address() + REL::Relocate(kCallOffsetSE, kCallOffsetAE);
@@ -346,14 +350,14 @@ namespace
             std::memcpy(&value, reinterpret_cast<const void*>(a_at), sizeof(value));
             return value;
         };
-        if (*reinterpret_cast<const std::uint8_t*>(site) != kCallOpcode || site + 5 + rel32(site + 1) != kInvokeId.address()) {
+        if (*reinterpret_cast<const std::uint8_t*>(site) != kCallOpcode || site + kCallLength + rel32(site + 1) != kInvokeId.address()) {
             return 0;
         }
         const auto lea = site - kLeaBeforeCall;
         if (std::memcmp(reinterpret_cast<const void*>(lea), kLeaR9, sizeof(kLeaR9)) != 0) {
             return 0;
         }
-        const auto* method = reinterpret_cast<const char*>(lea + 7 + rel32(lea + 3));
+        const auto* method = reinterpret_cast<const char*>(lea + kLeaLength + rel32(lea + sizeof(kLeaR9)));
         return std::string_view(method, kMethod.size()) == kMethod ? site : 0;
     }
 

@@ -40,9 +40,10 @@ namespace NT::Capture
     // Pending lines kept while nothing draws them (HUD hidden for long).
     inline constexpr std::size_t kMaxPendingEntries = 64;
 
-    // Writes the vtable hooks, once, when the plugin loads: mods hooking the
-    // HUD later wrap around them and still see every notification. The
-    // hooks pass everything to Vanilla until Activate().
+    // Writes the hooks once, when the plugin loads: the ShowMessage call-site
+    // hook (the HUDMenu::ProcessMessage vtable hook when the site does not
+    // check out) and HUDNotifications::Update. They pass everything on until
+    // Activate().
     void Install();
 
     // kDataLoaded, only when the SKSE Menu Framework is present (without it
