@@ -207,7 +207,7 @@ namespace
         { 1, 7, 99, 0 }, { 1, 7, 104, 0 },
     };
 
-    RecentMessage* g_recentMessages = nullptr;  // set by Install when the layout matches
+    RecentMessage* g_recentMessages = nullptr;  // set by Activate when the layout matches
 
     void FindEngineRepeatFilter()
     {
@@ -252,39 +252,53 @@ namespace
     // The hooks are written when the plugin loads, so mods that hook the
     // HUD later (at kDataLoaded or a game load, as ChatBox does) wrap around
     // ours: they see each notification, then call us, and we keep it from
-    // Vanilla. Until Activate() the hooks only pass everything on.
-    std::atomic<bool> g_active{ false };
+    // Vanilla. Until Activate() the hooks only pass everything on. Atomic:
+    // set on the main thread at kDataLoaded, read by the hooks.
+    std::atomic<bool> g_taking{ false };
 
     // Fallback for a mod that hooked HUDMenu::ProcessMessage even before us:
     // our "original" is that mod, not Vanilla, and a swallowed line would
     // never reach it. Taken lines are then passed on, and the copy Vanilla
-    // queues in the HUD movie is taken out again.
+    // queues in the HUD movie is taken out again. Written once at plugin
+    // load, before any HUD code runs.
     bool g_passOn = false;
 
-    // Vanilla queues a notification line for the HUD movie in
-    // MessagesInstance.MessageArray and shows it on a later frame. Right
-    // after the pass-on the line is the last entry there: remove it.
-    void DropVanillaLine(RE::IMenu* a_menu, std::string_view a_text)
+    // Vanilla queues a notification line for the HUD movie in this AS array
+    // of strings and shows it on a later frame.
+    constexpr auto kHudMessageQueue = "_root.HUDMovieBaseInstance.MessagesInstance.MessageArray";
+
+    // Entries in the HUD movie's message queue; nullopt if a HUD replacer
+    // has no such queue (logged once).
+    std::optional<std::uint32_t> HudQueueSize(RE::IMenu* a_menu, RE::GFxValue& a_queue)
     {
-        RE::GFxValue queue;
-        if (!a_menu->uiMovie || !a_menu->uiMovie->GetVariable(&queue, "_root.HUDMovieBaseInstance.MessagesInstance.MessageArray") ||
-            !queue.IsArray() || queue.GetArraySize() == 0) {
-            return;
+        if (a_menu->uiMovie && a_menu->uiMovie->GetVariable(&a_queue, kHudMessageQueue) && a_queue.IsArray()) {
+            return a_queue.GetArraySize();
         }
-        const auto   last = queue.GetArraySize() - 1;
-        RE::GFxValue entry;
-        if (queue.GetElement(last, &entry) && entry.IsString() && a_text == entry.GetString()) {
-            queue.RemoveElement(last);
-        } else {
-            static bool logged = false;
-            if (!logged) {
-                logged = true;
-                logs::warn("Passed-on notification not found in the HUD's message queue; Vanilla may show it too");
-            }
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            logs::warn("The HUD has no {}; passed-on notifications may show in Vanilla too", kHudMessageQueue);
         }
+        return std::nullopt;
     }
 
-    // The module a code address belongs to; nullptr if none.
+    // Passes a taken line on to the mod hooked before us; the entry Vanilla
+    // then adds to the HUD movie's queue (whatever that mod made of the
+    // text) is removed before it shows.
+    RE::UI_MESSAGE_RESULTS PassOn(RE::IMenu* a_menu, RE::UIMessage& a_message,
+        const REL::Relocation<RE::UI_MESSAGE_RESULTS(RE::IMenu*, RE::UIMessage&)>& a_previous)
+    {
+        RE::GFxValue queue;
+        const auto   before = HudQueueSize(a_menu, queue);
+        const auto   result = a_previous(a_menu, a_message);
+        if (before && HudQueueSize(a_menu, queue) == *before + 1) {
+            queue.RemoveElement(*before);
+        }
+        return result;
+    }
+
+    // The module a code address belongs to; nullptr if none, e.g. a hook
+    // stub in trampoline memory, which then counts as another mod.
     HMODULE ModuleOf(std::uintptr_t a_address)
     {
         HMODULE module = nullptr;
@@ -305,31 +319,31 @@ namespace
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
     // the request to show a notification line. Swallowing it here keeps it
     // out of the Vanilla HUDNotifications queue (and its one-at-a-time delay).
+    // Inert until Activate(); with g_passOn a taken line is handed on
+    // instead (PassOn).
     struct ProcessMessageHook
     {
         static RE::UI_MESSAGE_RESULTS thunk(RE::IMenu* a_this, RE::UIMessage& a_message)
         {
-            if (g_active && a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
+            if (g_taking && a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
                     data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
                     const char* text = data->text.c_str();
                     if (text && NT::CenterNotifications::HandleDebugMessage(text)) {
                         return RE::UI_MESSAGE_RESULTS::kHandled;
                     }
+                    const bool hasText = text && *text;
                     if (!NT::CaptureEnabled()) {
-                        if (text && *text) {
+                        if (hasText) {
                             RecordOnly(text);
                         }
                         return func(a_this, a_message);
                     }
-                    if (text && *text && !Take(text)) {
+                    if (hasText && !Take(text)) {
                         return func(a_this, a_message);  // icons we cannot draw: Vanilla can
                     }
-                    if (g_passOn && text && *text) {
-                        const std::string line = text;  // the other mod may change the message
-                        const auto        result = func(a_this, a_message);
-                        DropVanillaLine(a_this, line);
-                        return result;
+                    if (g_passOn && hasText) {
+                        return PassOn(a_this, a_message, func);
                     }
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
@@ -346,7 +360,7 @@ namespace
     {
         static void thunk(RE::HUDNotifications* a_this)
         {
-            if (!g_active) {
+            if (!g_taking) {
                 func(a_this);
                 return;
             }
@@ -405,13 +419,14 @@ namespace NT::Capture
         REL::Relocation<std::uintptr_t> notifications{ RE::VTABLE_HUDNotifications[0] };
         UpdateHook::func = notifications.write_vfunc(0x1, UpdateHook::thunk);
 
-        logs::info("Hooked HUDMenu::ProcessMessage and HUDNotifications::Update");
+        logs::info("Hooked HUDMenu::ProcessMessage and HUDNotifications::Update (inactive until data is loaded)");
     }
 
     void Activate()
     {
         FindEngineRepeatFilter();
-        g_active = true;
+        g_taking = true;
+        logs::info("Taking notifications");
     }
 
     bool Push(std::string_view a_raw)
