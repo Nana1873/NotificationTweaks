@@ -275,9 +275,80 @@ namespace
         return std::filesystem::path(path).filename().string();
     }
 
+    // A notification line on its way to the HUD: true when it is ours (taken,
+    // empty or a test line) and Vanilla must not show it.
+    bool Intercept(const char* a_text)
+    {
+        if (a_text && NT::CenterNotifications::HandleDebugMessage(a_text)) {
+            return true;
+        }
+        const bool hasText = a_text && *a_text;
+        if (!NT::CaptureEnabled()) {
+            if (hasText) {
+                RecordOnly(a_text);
+            }
+            return false;
+        }
+        return !hasText || Take(a_text);  // not taken: icons we cannot draw, Vanilla can
+    }
+
+    // Inside Vanilla's HUDMenu::ProcessMessage, the one call that hands a
+    // notification line to the HUD movie (method "ShowMessage", the text as
+    // the only argument). Every other mod's ProcessMessage hook has run by
+    // then, whenever it was written, so the line is final: ChatBox has read
+    // it, I'm Using This Now has replaced its text. Inert until Activate().
+    struct ShowMessageCall
+    {
+        static std::uintptr_t thunk(void* a_1, void* a_2, void* a_3, const char* a_method, RE::GFxValue* a_args, std::uint64_t a_count,
+            bool a_flag)
+        {
+            if (g_taking && a_args && a_count > 0) {
+                const auto& arg = a_args[0];
+                if (arg.IsString() && Intercept(arg.GetString())) {
+                    return 0;
+                }
+                if (arg.IsStringW() && Intercept(NT::Text::ToUtf8(arg.GetStringW()).c_str())) {
+                    return 0;
+                }
+            }
+            return func(a_1, a_2, a_3, a_method, a_args, a_count, a_flag);
+        }
+        static inline REL::Relocation<decltype(thunk)> func;
+    };
+
+    // The call site per runtime, checked before anything is written: a
+    // call (E8) to the expected function, with "ShowMessage" loaded into r9
+    // 0x15 bytes before it. Found on SE 1.5.97, AE 1.6.1170 and 1.7.104.
+    // Other versions use it only when the check passes; VR never.
+    std::uintptr_t FindShowMessageCall()
+    {
+        if (REL::Module::IsVR()) {
+            return 0;
+        }
+        const auto site = REL::Relocation<std::uintptr_t>{ RELOCATION_ID(50718, 51612) }.address() + REL::Relocate(0x65E, 0x686);
+        const auto callee = REL::Relocation<std::uintptr_t>{ RELOCATION_ID(80233, 82256) }.address();
+        const auto rel32 = [](std::uintptr_t a_at) {
+            std::int32_t value;
+            std::memcpy(&value, reinterpret_cast<const void*>(a_at), sizeof(value));
+            return value;
+        };
+        const auto* call = reinterpret_cast<const std::uint8_t*>(site);
+        if (call[0] != 0xE8 || site + 5 + rel32(site + 1) != callee) {
+            return 0;
+        }
+        const auto  lea = site - 0x15;
+        const auto* leaBytes = reinterpret_cast<const std::uint8_t*>(lea);
+        if (leaBytes[0] != 0x4C || leaBytes[1] != 0x8D || leaBytes[2] != 0x0D) {  // lea r9, [rip+disp32]
+            return 0;
+        }
+        const auto* method = reinterpret_cast<const char*>(lea + 7 + rel32(lea + 3));
+        return std::string_view(method, 12) == std::string_view("ShowMessage\0", 12) ? site : 0;
+    }
+
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
-    // the request to show a notification line. Swallowing it here keeps it
-    // out of the Vanilla HUDNotifications queue (and its one-at-a-time delay).
+    // the request to show a notification line. Only used when the
+    // ShowMessage call site is not found: swallowing the line here keeps it
+    // from Vanilla, but a mod that hooked this before us never sees it.
     // Inert until Activate().
     struct ProcessMessageHook
     {
@@ -285,21 +356,7 @@ namespace
         {
             if (g_taking && a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
-                    data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
-                    const char* text = data->text.c_str();
-                    if (text && NT::CenterNotifications::HandleDebugMessage(text)) {
-                        return RE::UI_MESSAGE_RESULTS::kHandled;
-                    }
-                    const bool hasText = text && *text;
-                    if (!NT::CaptureEnabled()) {
-                        if (hasText) {
-                            RecordOnly(text);
-                        }
-                        return func(a_this, a_message);
-                    }
-                    if (hasText && !Take(text)) {
-                        return func(a_this, a_message);  // icons we cannot draw: Vanilla can
-                    }
+                    data && data->type == RE::HUD_MESSAGE_TYPE::kNotification && Intercept(data->text.c_str())) {
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
             }
@@ -361,20 +418,26 @@ namespace NT::Capture
 {
     void Install()
     {
-        REL::Relocation<std::uintptr_t> hudMenu{ RE::VTABLE_HUDMenu[0] };
-        ProcessMessageHook::func = hudMenu.write_vfunc(0x4, ProcessMessageHook::thunk);
-        // Inside the game's own module: Vanilla. Anywhere else: a mod that
-        // hooked even before us; it does not see the lines we take (passing
-        // them on would let Vanilla show them too, see design notes).
-        if (const auto previous = ModuleOf(ProcessMessageHook::func.address());
-            previous != reinterpret_cast<HMODULE>(REL::Module::get().pointer())) {
-            logs::info("HUDMenu::ProcessMessage was already hooked by {}; it does not see the notifications taken here", ModuleName(previous));
+        if (const auto site = FindShowMessageCall()) {
+            SKSE::AllocTrampoline(14);
+            ShowMessageCall::func = SKSE::GetTrampoline().write_call<5>(site, ShowMessageCall::thunk);
+            logs::info("Hooked the HUD's ShowMessage call in HUDMenu::ProcessMessage");
+        } else {
+            REL::Relocation<std::uintptr_t> hudMenu{ RE::VTABLE_HUDMenu[0] };
+            ProcessMessageHook::func = hudMenu.write_vfunc(0x4, ProcessMessageHook::thunk);
+            logs::info("ShowMessage call not found on this runtime; hooked HUDMenu::ProcessMessage instead");
+            // Inside the game's own module: Vanilla. Anywhere else: a mod
+            // that hooked even before us; it does not see the lines we take.
+            if (const auto previous = ModuleOf(ProcessMessageHook::func.address());
+                previous != reinterpret_cast<HMODULE>(REL::Module::get().pointer())) {
+                logs::info("HUDMenu::ProcessMessage was already hooked by {}; it does not see the notifications taken here", ModuleName(previous));
+            }
         }
 
         REL::Relocation<std::uintptr_t> notifications{ RE::VTABLE_HUDNotifications[0] };
         UpdateHook::func = notifications.write_vfunc(0x1, UpdateHook::thunk);
 
-        logs::info("Hooked HUDMenu::ProcessMessage and HUDNotifications::Update (inactive until data is loaded)");
+        logs::info("Hooked HUDNotifications::Update (all hooks inactive until data is loaded)");
     }
 
     void Activate()
