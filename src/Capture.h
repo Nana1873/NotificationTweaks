@@ -40,9 +40,14 @@ namespace NT::Capture
     // Pending lines kept while nothing draws them (HUD hidden for long).
     inline constexpr std::size_t kMaxPendingEntries = 64;
 
-    // Writes the vtable hooks. Called once at kDataLoaded, only when the SKSE
-    // Menu Framework is present (without it nothing could draw the text).
+    // Writes the vtable hooks, once, when the plugin loads: mods hooking the
+    // HUD later wrap around them and still see every notification. The
+    // hooks pass everything to Vanilla until Activate().
     void Install();
+
+    // kDataLoaded, only when the SKSE Menu Framework is present (without it
+    // nothing could draw the text): the hooks start taking notifications.
+    void Activate();
 
     // Main thread: a notification the HUD would have shown. False when the
     // line has nothing the overlay can draw (only icons of a font IconFont

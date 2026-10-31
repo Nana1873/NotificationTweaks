@@ -14,6 +14,20 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   handled, so the Vanilla `HUDNotifications` queue (one line at a time,
   the "delay") never sees it. Disabled, the line is only recorded in the
   history and passed on.
+- Hook order and other mods (1.3.1): both hooks are written in
+  `SKSEPlugin_Load` and stay inert until `Activate()` at `kDataLoaded`
+  (only with SKSE Menu Framework present). In a vtable chain the hook
+  written last runs first, so a mod hooking `HUDMenu::ProcessMessage`
+  later wraps around ours: ChatBox (Nexus 169429) hooks at data load,
+  calls its original (us) first and then reads the `HUDData` text, so it
+  gets every line while Vanilla does not. Fallback when a DLL hooked even
+  before us (the slot then points outside the game module, logged as
+  "already hooked by"): a taken line is passed on to that hook, and the
+  copy Vanilla pushes into the HUD movie's queue
+  (`HUDMovieBaseInstance.MessagesInstance.MessageArray`, a plain AS array
+  of strings, shown on a later frame) is removed right after. Vanilla
+  never routes these lines through `HUDNotifications::ProcessMessage` or
+  its native queue; both were tried.
 - `HUDNotifications::Update` (vfunc 0x1) is a second net: plain
   notification entries (no quest, no word of power) are taken out of the
   queue before Vanilla shows them. In every test so far all lines came

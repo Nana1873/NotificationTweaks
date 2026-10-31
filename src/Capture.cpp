@@ -249,10 +249,16 @@ namespace
         return true;
     }
 
-    // Another mod hooked HUDMenu::ProcessMessage before us (ChatBox reads
-    // notifications there): our "original" is that mod, not Vanilla, and a
-    // swallowed line would never reach it. Taken lines are then passed on,
-    // and the copy Vanilla queues in the HUD movie is taken out again.
+    // The hooks are written when the plugin loads, so mods that hook the
+    // HUD later (at kDataLoaded or a game load, as ChatBox does) wrap around
+    // ours: they see each notification, then call us, and we keep it from
+    // Vanilla. Until Activate() the hooks only pass everything on.
+    std::atomic<bool> g_active{ false };
+
+    // Fallback for a mod that hooked HUDMenu::ProcessMessage even before us:
+    // our "original" is that mod, not Vanilla, and a swallowed line would
+    // never reach it. Taken lines are then passed on, and the copy Vanilla
+    // queues in the HUD movie is taken out again.
     bool g_passOn = false;
 
     // Vanilla queues a notification line for the HUD movie in
@@ -303,7 +309,7 @@ namespace
     {
         static RE::UI_MESSAGE_RESULTS thunk(RE::IMenu* a_this, RE::UIMessage& a_message)
         {
-            if (a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
+            if (g_active && a_message.type == RE::UI_MESSAGE_TYPE::kUpdate && a_message.data) {
                 if (const auto* data = skyrim_cast<RE::HUDData*>(a_message.data);
                     data && data->type == RE::HUD_MESSAGE_TYPE::kNotification) {
                     const char* text = data->text.c_str();
@@ -340,6 +346,10 @@ namespace
     {
         static void thunk(RE::HUDNotifications* a_this)
         {
+            if (!g_active) {
+                func(a_this);
+                return;
+            }
             if (a_this && NT::CaptureEnabled()) {
                 auto& queue = a_this->queue;
                 for (auto it = queue.begin(); it != queue.end();) {
@@ -395,9 +405,13 @@ namespace NT::Capture
         REL::Relocation<std::uintptr_t> notifications{ RE::VTABLE_HUDNotifications[0] };
         UpdateHook::func = notifications.write_vfunc(0x1, UpdateHook::thunk);
 
-        FindEngineRepeatFilter();
-
         logs::info("Hooked HUDMenu::ProcessMessage and HUDNotifications::Update");
+    }
+
+    void Activate()
+    {
+        FindEngineRepeatFilter();
+        g_active = true;
     }
 
     bool Push(std::string_view a_raw)

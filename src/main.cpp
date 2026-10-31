@@ -61,7 +61,7 @@ namespace
         if (NT::Config().drawIconFonts) {
             NT::IconFont::Preload();  // during the loading screen, not mid-game
         }
-        NT::Capture::Install();
+        NT::Capture::Activate();
         NT::Overlay::Initialize();
         NT::MenuIntegration::Initialize();
         g_active = true;
@@ -82,5 +82,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     }
 
     SKSE::GetMessagingInterface()->RegisterListener(MessageHandler);
+    NT::Capture::Install();
     return true;
 }
