@@ -249,6 +249,53 @@ namespace
         return true;
     }
 
+    // Another mod hooked HUDMenu::ProcessMessage before us (ChatBox reads
+    // notifications there): our "original" is that mod, not Vanilla, and a
+    // swallowed line would never reach it. Taken lines are then passed on,
+    // and the copy Vanilla queues in the HUD movie is taken out again.
+    bool g_passOn = false;
+
+    // Vanilla queues a notification line for the HUD movie in
+    // MessagesInstance.MessageArray and shows it on a later frame. Right
+    // after the pass-on the line is the last entry there: remove it.
+    void DropVanillaLine(RE::IMenu* a_menu, std::string_view a_text)
+    {
+        RE::GFxValue queue;
+        if (!a_menu->uiMovie || !a_menu->uiMovie->GetVariable(&queue, "_root.HUDMovieBaseInstance.MessagesInstance.MessageArray") ||
+            !queue.IsArray() || queue.GetArraySize() == 0) {
+            return;
+        }
+        const auto   last = queue.GetArraySize() - 1;
+        RE::GFxValue entry;
+        if (queue.GetElement(last, &entry) && entry.IsString() && a_text == entry.GetString()) {
+            queue.RemoveElement(last);
+        } else {
+            static bool logged = false;
+            if (!logged) {
+                logged = true;
+                logs::warn("Passed-on notification not found in the HUD's message queue; Vanilla may show it too");
+            }
+        }
+    }
+
+    // The module a code address belongs to; nullptr if none.
+    HMODULE ModuleOf(std::uintptr_t a_address)
+    {
+        HMODULE module = nullptr;
+        ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(a_address), &module);
+        return module;
+    }
+
+    std::string ModuleName(HMODULE a_module)
+    {
+        char path[MAX_PATH]{};
+        if (!a_module || !::GetModuleFileNameA(a_module, path, MAX_PATH)) {
+            return "an unknown module";
+        }
+        return std::filesystem::path(path).filename().string();
+    }
+
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
     // the request to show a notification line. Swallowing it here keeps it
     // out of the Vanilla HUDNotifications queue (and its one-at-a-time delay).
@@ -271,6 +318,12 @@ namespace
                     }
                     if (text && *text && !Take(text)) {
                         return func(a_this, a_message);  // icons we cannot draw: Vanilla can
+                    }
+                    if (g_passOn && text && *text) {
+                        const std::string line = text;  // the other mod may change the message
+                        const auto        result = func(a_this, a_message);
+                        DropVanillaLine(a_this, line);
+                        return result;
                     }
                     return RE::UI_MESSAGE_RESULTS::kHandled;
                 }
@@ -331,6 +384,13 @@ namespace NT::Capture
     {
         REL::Relocation<std::uintptr_t> hudMenu{ RE::VTABLE_HUDMenu[0] };
         ProcessMessageHook::func = hudMenu.write_vfunc(0x4, ProcessMessageHook::thunk);
+        // Inside the game's own module: Vanilla. Anywhere else: a mod that
+        // hooked first and expects to see the notifications.
+        const auto previous = ModuleOf(ProcessMessageHook::func.address());
+        g_passOn = previous != reinterpret_cast<HMODULE>(REL::Module::get().pointer());
+        if (g_passOn) {
+            logs::info("HUDMenu::ProcessMessage was already hooked by {}: notifications are passed on to it", ModuleName(previous));
+        }
 
         REL::Relocation<std::uintptr_t> notifications{ RE::VTABLE_HUDNotifications[0] };
         UpdateHook::func = notifications.write_vfunc(0x1, UpdateHook::thunk);
