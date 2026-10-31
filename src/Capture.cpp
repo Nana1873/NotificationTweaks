@@ -238,8 +238,8 @@ namespace
         }
     }
 
-    // Both hooks: hand the line to the overlay; when it is taken, also clear
-    // the engine's repeat filter. False: Vanilla shows it.
+    // Intercept and UpdateHook: hand the line to the overlay; when it is
+    // taken, also clear the engine's repeat filter. False: Vanilla shows it.
     bool Take(const char* a_text)
     {
         if (!NT::Capture::Push(a_text)) {
@@ -249,11 +249,10 @@ namespace
         return true;
     }
 
-    // The hooks are written when the plugin loads, so mods that hook the
-    // HUD later (at kDataLoaded or a game load, as ChatBox does) wrap around
-    // ours: they see each notification, then call us, and we keep it from
-    // Vanilla. Until Activate() the hooks only pass everything on. Atomic:
-    // set on the main thread at kDataLoaded, read by the hooks.
+    // The hooks are written when the plugin loads and only pass everything
+    // on until Activate() (kDataLoaded, with SKSE Menu Framework present).
+    // Hook order against other mods: see ShowMessageCall. Atomic: set on the
+    // main thread, read by the hooks.
     std::atomic<bool> g_taking{ false };
 
     // The module a code address belongs to; nullptr if none, e.g. a hook
@@ -293,56 +292,69 @@ namespace
     }
 
     // Inside Vanilla's HUDMenu::ProcessMessage, the one call that hands a
-    // notification line to the HUD movie (method "ShowMessage", the text as
-    // the only argument). Every other mod's ProcessMessage hook has run by
-    // then, whenever it was written, so the line is final: ChatBox has read
-    // it, I'm Using This Now has replaced its text. Inert until Activate().
+    // notification line to the HUD movie: GFxValue::ObjectInterface::Invoke
+    // with the method "ShowMessage" and the text as the only argument (only
+    // the kNotification case of the function's switch reaches it; the
+    // caller ignores the result). Every other mod's ProcessMessage hook has
+    // run by then, whenever it was written, so the line is final: ChatBox
+    // has read it, I'm Using This Now has replaced its text. Inert until
+    // Activate().
     struct ShowMessageCall
     {
-        static std::uintptr_t thunk(void* a_1, void* a_2, void* a_3, const char* a_method, RE::GFxValue* a_args, std::uint64_t a_count,
-            bool a_flag)
+        static bool thunk(void* a_objectInterface, void* a_data, RE::GFxValue* a_result, const char* a_method, RE::GFxValue* a_args,
+            std::uint64_t a_numArgs, bool a_isDisplayObject)
         {
-            if (g_taking && a_args && a_count > 0) {
-                const auto& arg = a_args[0];
-                if (arg.IsString() && Intercept(arg.GetString())) {
-                    return 0;
+            if (g_taking && a_args && a_numArgs > 0) {
+                const auto& text = a_args[0];
+                if (text.IsString() && Intercept(text.GetString())) {
+                    return true;
                 }
-                if (arg.IsStringW() && Intercept(NT::Text::ToUtf8(arg.GetStringW()).c_str())) {
-                    return 0;
+                if (text.IsStringW() && Intercept(NT::Text::ToUtf8(text.GetStringW()).c_str())) {
+                    return true;
                 }
             }
-            return func(a_1, a_2, a_3, a_method, a_args, a_count, a_flag);
+            return func(a_objectInterface, a_data, a_result, a_method, a_args, a_numArgs, a_isDisplayObject);
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
 
-    // The call site per runtime, checked before anything is written: a
-    // call (E8) to the expected function, with "ShowMessage" loaded into r9
-    // 0x15 bytes before it. Found on SE 1.5.97, AE 1.6.1170 and 1.7.104.
-    // Other versions use it only when the check passes; VR never.
+    // Where the call sits, from the running game's disassembly (SE 1.5.97,
+    // AE 1.6.1170 and 1.7.104; re-deriving it: design-notes, Capture).
+    constexpr REL::RelocationID kProcessMessageId{ 50718, 51612 };  // HUDMenu::ProcessMessage (vfunc 0x4)
+    constexpr REL::RelocationID kInvokeId{ 80233, 82256 };          // GFxValue::ObjectInterface::Invoke
+    constexpr std::size_t       kCallOffsetSE = 0x65E;
+    constexpr std::size_t       kCallOffsetAE = 0x686;
+    constexpr std::size_t       kLeaBeforeCall = 0x15;  // lea r9, "ShowMessage" (7 bytes) + the argument setup
+    constexpr std::uint8_t      kCallOpcode = 0xE8;
+    constexpr std::uint8_t      kLeaR9[] = { 0x4C, 0x8D, 0x0D };  // lea r9, [rip+disp32]
+    constexpr std::string_view  kMethod{ "ShowMessage", sizeof("ShowMessage") };  // with its terminator
+
+    // The call site, checked before anything is written: a call to Invoke,
+    // with "ShowMessage" loaded into r9 just before it. Only on runtimes
+    // whose Address Library was checked to have both IDs (all SE 1.5 and
+    // AE 1.6/1.7 libraries; a missing ID would stop the game, NG's lookup
+    // does not fail softly); the byte check then decides. VR never.
     std::uintptr_t FindShowMessageCall()
     {
-        if (REL::Module::IsVR()) {
+        const auto version = REL::Module::get().version();
+        if (REL::Module::IsVR() || version < REL::Version{ 1, 5, 3, 0 } || version > REL::Version{ 1, 7, 104, 0 }) {
             return 0;
         }
-        const auto site = REL::Relocation<std::uintptr_t>{ RELOCATION_ID(50718, 51612) }.address() + REL::Relocate(0x65E, 0x686);
-        const auto callee = REL::Relocation<std::uintptr_t>{ RELOCATION_ID(80233, 82256) }.address();
+        const auto site = kProcessMessageId.address() + REL::Relocate(kCallOffsetSE, kCallOffsetAE);
         const auto rel32 = [](std::uintptr_t a_at) {
             std::int32_t value;
             std::memcpy(&value, reinterpret_cast<const void*>(a_at), sizeof(value));
             return value;
         };
-        const auto* call = reinterpret_cast<const std::uint8_t*>(site);
-        if (call[0] != 0xE8 || site + 5 + rel32(site + 1) != callee) {
+        if (*reinterpret_cast<const std::uint8_t*>(site) != kCallOpcode || site + 5 + rel32(site + 1) != kInvokeId.address()) {
             return 0;
         }
-        const auto  lea = site - 0x15;
-        const auto* leaBytes = reinterpret_cast<const std::uint8_t*>(lea);
-        if (leaBytes[0] != 0x4C || leaBytes[1] != 0x8D || leaBytes[2] != 0x0D) {  // lea r9, [rip+disp32]
+        const auto lea = site - kLeaBeforeCall;
+        if (std::memcmp(reinterpret_cast<const void*>(lea), kLeaR9, sizeof(kLeaR9)) != 0) {
             return 0;
         }
         const auto* method = reinterpret_cast<const char*>(lea + 7 + rel32(lea + 3));
-        return std::string_view(method, 12) == std::string_view("ShowMessage\0", 12) ? site : 0;
+        return std::string_view(method, kMethod.size()) == kMethod ? site : 0;
     }
 
     // HUDMenu::ProcessMessage: a kUpdate carrying HUDData kNotification is
@@ -425,7 +437,8 @@ namespace NT::Capture
         } else {
             REL::Relocation<std::uintptr_t> hudMenu{ RE::VTABLE_HUDMenu[0] };
             ProcessMessageHook::func = hudMenu.write_vfunc(0x4, ProcessMessageHook::thunk);
-            logs::info("ShowMessage call not found on this runtime; hooked HUDMenu::ProcessMessage instead");
+            logs::info("ShowMessage call not as expected on {} (other runtime, or already patched by another mod); hooked HUDMenu::ProcessMessage instead",
+                REL::Module::get().version().string());
             // Inside the game's own module: Vanilla. Anywhere else: a mod
             // that hooked even before us; it does not see the lines we take.
             if (const auto previous = ModuleOf(ProcessMessageHook::func.address());
