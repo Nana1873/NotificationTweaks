@@ -147,8 +147,8 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   Dialogue is not on the list: lines show during conversations. With
   `ShowInMenus` on, lines keep aging in those menus although the game is
   paused there; frozen at age 0 they stayed invisible (fade-in alpha 0)
-  until the menu closed. Unverified: whether `HudVisible` already blocks
-  them in some of these menus (HUD movie hidden).
+  until the menu closed. Verified in the barter menu without Skyrim Souls
+  RE (AE 1.6.1170): `HudVisible` does not block there, the line shows.
 - Layout editor ("Edit layout..." on the Display page): an SMF window
   (`AddWindow`) with Done replaces the main window. A yellow frame around
   the lines and a labelled box per center group (see Center
@@ -169,6 +169,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
 
 - `Data/SKSE/Plugins/NotificationTweaks.ini`; the dev mod ships an empty
   one so USVFS writes back into the mod instead of overwrite.
+- The release zip ships no INI, so the first save creates it. Under MO2
+  that lands in `overwrite\` and is read back on the next start (tested
+  on AE 1.6.1170 with no INI anywhere, 1.4.0). A failed write is logged
+  once with path and Windows error (#2: "settings reset every restart",
+  not reproduced; a read-only game folder would look exactly like that).
 - `$Key` notifications are translated through our table, then only the
   translator's virtual `Translate()`. Never read `translationMap` (or any
   translator member) directly: ScaleformTranslationPP installs its own

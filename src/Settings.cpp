@@ -42,6 +42,18 @@ namespace
         return ec ? std::string(kIniRelative) : path.string();
     }
 
+    // A failed write keeps the setting for this session only; without a log
+    // line that looks like "settings reset after a restart" (seen on Nexus).
+    void LogWriteFailure(const char* a_section, const std::string& a_path)
+    {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            logs::warn("Could not save [{}] to {} (Windows error {}); settings last only until the game closes", a_section, a_path,
+                ::GetLastError());
+        }
+    }
+
     // ReadString's buffer; [Hidden] and [Durations] keys must fit into it.
     constexpr std::size_t kReadBuffer = 2048;
     constexpr std::size_t kMaxKeyValue = kReadBuffer - 48;  // headroom for the quotes
@@ -91,7 +103,9 @@ namespace
         section += '\0';
         section += lines;
         section += '\0';
-        WritePrivateProfileSectionA(a_section, section.c_str(), path.c_str());
+        if (!WritePrivateProfileSectionA(a_section, section.c_str(), path.c_str())) {
+            LogWriteFailure(a_section, path);
+        }
     }
 
     // The whole text as a finite float, or nothing.
@@ -150,7 +164,9 @@ namespace
 
     void Write(const char* a_section, const char* a_key, const std::string& a_value, const std::string& a_path)
     {
-        WritePrivateProfileStringA(a_section, a_key, a_value.c_str(), a_path.c_str());
+        if (!WritePrivateProfileStringA(a_section, a_key, a_value.c_str(), a_path.c_str())) {
+            LogWriteFailure(a_section, a_path);
+        }
     }
 
 }
