@@ -144,7 +144,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   loading screens. With `ShowInMenus` off (default), lines wait while a
   full-screen menu is open and appear when it closes; those menus are detected by name because
   Skyrim Souls RE keeps them unpaused, so `GameIsPaused()` is false there.
-  Dialogue is not on the list: lines show during conversations.
+  Dialogue is not on the list: lines show during conversations. With
+  `ShowInMenus` on, lines keep aging in those menus although the game is
+  paused there; frozen at age 0 they stayed invisible (fade-in alpha 0)
+  until the menu closed. Unverified: whether `HudVisible` already blocks
+  them in some of these menus (HUD movie hidden).
 - Layout editor ("Edit layout..." on the Display page): an SMF window
   (`AddWindow`) with Done replaces the main window. A yellow frame around
   the lines and a labelled box per center group (see Center
