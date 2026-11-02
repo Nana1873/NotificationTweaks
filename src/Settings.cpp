@@ -162,10 +162,28 @@ namespace
         }
     }
 
-    void Write(const char* a_section, const char* a_key, const std::string& a_value, const std::string& a_path)
+    // One settings section, written whole like [Hidden] and [Durations]. A
+    // user's MO2 setup (MO2 2.5.2, game outside the instance) dropped every
+    // per-key WritePrivateProfileString without an error while section
+    // writes landed, so all sections go through the same call now.
+    struct Section
     {
-        if (!WritePrivateProfileStringA(a_section, a_key, a_value.c_str(), a_path.c_str())) {
-            LogWriteFailure(a_section, a_path);
+        const char*                                      name;
+        std::vector<std::pair<std::string, std::string>> keys;
+    };
+
+    void WriteSection(const Section& a_section, const std::string& a_path)
+    {
+        std::string body;
+        for (const auto& [key, value] : a_section.keys) {
+            body += key;
+            body += '=';
+            body += value;
+            body += '\0';
+        }
+        body += '\0';
+        if (!WritePrivateProfileSectionA(a_section.name, body.c_str(), a_path.c_str())) {
+            LogWriteFailure(a_section.name, a_path);
         }
     }
 
@@ -239,48 +257,51 @@ namespace NT
         std::error_code ec;
         std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
 
-        Write("General", "Enabled", b(s.enabled), path);
-        Write("General", "VerboseLog", b(s.verboseLog), path);
-
-        Write("Layout", "PosX", f(s.posX), path);
-        Write("Layout", "PosY", f(s.posY), path);
-        Write("Layout", "Align", std::to_string(static_cast<int>(s.align)), path);
-        Write("Layout", "NewestOnTop", b(s.newestOnTop), path);
-        Write("Layout", "MaxWidth", f(s.maxWidth), path);
-        Write("Layout", "MaxVisible", std::to_string(s.maxVisible), path);
-        Write("Layout", "ShowInMenus", b(s.showInMenus), path);
-
         std::uint32_t rgba = 0;
         for (int i = 0; i < 4; ++i) {
             rgba |= static_cast<std::uint32_t>(std::lround(std::clamp(s.textColor[i], 0.0F, 1.0F) * 255.0F)) << (24 - 8 * i);
         }
-        Write("Style", "Font", s.font, path);
-        Write("Style", "FontSize1080", f(s.fontSize), path);
-        Write("Style", "LineSpacing1080", f(s.lineSpacing), path);
-        Write("Style", "TextColor", std::format("{:08X}", rgba), path);
-        Write("Style", "Effect", std::to_string(static_cast<int>(s.effect)), path);
-        Write("Style", "BackgroundAlpha", f(s.backgroundAlpha), path);
-
-        Write("Timing", "Immediate", b(s.immediate), path);
-        Write("Timing", "QueueDelay", f(s.queueDelay), path);
-        Write("Timing", "Duration", f(s.duration), path);
-        Write("Timing", "FadeIn", f(s.fadeIn), path);
-        Write("Timing", "FadeOut", f(s.fadeOut), path);
-        Write("Timing", "StackDuplicates", b(s.stackDuplicates), path);
-
-        Write("Compatibility", "MergeYPS", b(s.mergeYps), path);
-        Write("Compatibility", "MergeBoS", b(s.mergeBos), path);
-        Write("Compatibility", "MergeGeneric", b(s.mergeGeneric), path);
-        Write("Compatibility", "MergeWindow", f(s.mergeWindow), path);
-        Write("Compatibility", "YPSLimit", std::to_string(s.ypsLimit), path);
-        Write("Compatibility", "DrawIconFonts", b(s.drawIconFonts), path);
-
+        std::vector<Section> sections{
+            { "General", { { "Enabled", b(s.enabled) }, { "VerboseLog", b(s.verboseLog) } } },
+            { "Layout",
+                { { "PosX", f(s.posX) }, { "PosY", f(s.posY) }, { "Align", std::to_string(static_cast<int>(s.align)) },
+                    { "NewestOnTop", b(s.newestOnTop) }, { "MaxWidth", f(s.maxWidth) }, { "MaxVisible", std::to_string(s.maxVisible) },
+                    { "ShowInMenus", b(s.showInMenus) } } },
+            { "Style",
+                { { "Font", s.font }, { "FontSize1080", f(s.fontSize) }, { "LineSpacing1080", f(s.lineSpacing) },
+                    { "TextColor", std::format("{:08X}", rgba) }, { "Effect", std::to_string(static_cast<int>(s.effect)) },
+                    { "BackgroundAlpha", f(s.backgroundAlpha) } } },
+            { "Timing",
+                { { "Immediate", b(s.immediate) }, { "QueueDelay", f(s.queueDelay) }, { "Duration", f(s.duration) },
+                    { "FadeIn", f(s.fadeIn) }, { "FadeOut", f(s.fadeOut) }, { "StackDuplicates", b(s.stackDuplicates) } } },
+            { "Compatibility",
+                { { "MergeYPS", b(s.mergeYps) }, { "MergeBoS", b(s.mergeBos) }, { "MergeGeneric", b(s.mergeGeneric) },
+                    { "MergeWindow", f(s.mergeWindow) }, { "YPSLimit", std::to_string(s.ypsLimit) },
+                    { "DrawIconFonts", b(s.drawIconFonts) } } },
+            { "CenterNotifications", {} },
+        };
         for (std::size_t i = 0; i < kCenterGroups; ++i) {
             const std::string key = kCenterKeys[i];
             const auto&       c = s.center[i];
-            Write("CenterNotifications", (key + "X").c_str(), f(c.x), path);
-            Write("CenterNotifications", (key + "Y").c_str(), f(c.y), path);
-            Write("CenterNotifications", (key + "Scale").c_str(), f(c.scale), path);
+            auto&             keys = sections.back().keys;
+            keys.emplace_back(key + "X", f(c.x));
+            keys.emplace_back(key + "Y", f(c.y));
+            keys.emplace_back(key + "Scale", f(c.scale));
+        }
+        for (const auto& section : sections) {
+            WriteSection(section, path);
+        }
+
+        // Read one value back: a write that Windows reports as done but that
+        // never reaches the file (the case above) shows in the log.
+        static bool checked = false;
+        if (!checked) {
+            checked = true;
+            if (ReadString("Style", "FontSize1080", "", path) != f(s.fontSize)) {
+                logs::warn("Settings saved to {} could not be read back; they may last only until the game closes", path);
+            } else {
+                logs::info("Settings saved to {}", path);
+            }
         }
         PublishCapture();
     }
