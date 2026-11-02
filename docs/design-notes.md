@@ -174,8 +174,12 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   on AE 1.6.1170 with no INI anywhere, 1.4.0). A failed write is logged
   once with path and Windows error.
 - Settings are written one whole section at a time
-  (`WritePrivateProfileSectionA`), like [Hidden] and [Durations], and the
-  first save of a session reads one value back and logs the result. #2
+  (`WritePrivateProfileSectionA`, one `WriteSection` for all of them,
+  [Hidden] and [Durations] included). A whole write also drops keys and
+  comments a user added to those sections by hand. The first save of a
+  session reads every value back and logs a warning on a mismatch; a
+  match is no proof the values persist (a redirect would answer the read
+  as well). #2
   (MO2 2.5.2, game in a Steam library outside the instance): every
   per-key `WritePrivateProfileStringA` was dropped with no error and no
   file, while the [Durations] section write created the INI. Not

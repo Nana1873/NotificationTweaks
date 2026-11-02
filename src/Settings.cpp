@@ -65,6 +65,33 @@ namespace
         return buf;
     }
 
+    // One INI section and its key=value entries, in file order.
+    struct Section
+    {
+        const char*                                      name;
+        std::vector<std::pair<std::string, std::string>> entries;
+    };
+
+    // Every section is written whole, never key by key: on a user's setup
+    // the per-key writes were dropped without an error (#2, design-notes).
+    // A whole write also drops keys and comments added to it by hand.
+    void WriteSection(const Section& a_section, const std::string& a_path)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(a_path).parent_path(), ec);
+        std::string body;
+        for (const auto& [key, value] : a_section.entries) {
+            body += key;
+            body += '=';
+            body += value;
+            body += '\0';
+        }
+        body += '\0';
+        if (!WritePrivateProfileSectionA(a_section.name, body.c_str(), a_path.c_str())) {
+            LogWriteFailure(a_section.name, a_path);
+        }
+    }
+
     // A key list section ([Hidden], [Durations]): Count, then LineN with the
     // key and, when given, TimeN with its value.
     struct KeyLine
@@ -73,17 +100,11 @@ namespace
         std::optional<float>       time;  // seconds, written with one decimal
     };
 
+    // Replaced as a whole, so Count and the lines never get out of step.
     void WriteKeySection(const char* a_section, const std::vector<KeyLine>& a_lines)
     {
-        const auto path = IniPath();
-        std::error_code ec;
-        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
-
-        // One section write (one file rewrite) instead of one per key; it
-        // also replaces the old section as a whole, so Count and the lines
-        // never get out of step.
-        std::string lines;
-        int         count = 0;
+        Section section{ a_section, { { "Count", "" } } };
+        int     count = 0;
         for (const auto& line : a_lines) {
             const auto value = NT::Text::PercentEscape(line.key);
             if (value.size() > kMaxKeyValue) {
@@ -92,20 +113,13 @@ namespace
             }
             // Quoted: the profile API strips outer quotes on read, so leading
             // or trailing spaces and quotes inside the text survive.
-            lines += std::format("Line{}=\"{}\"", ++count, value);
-            lines += '\0';
+            section.entries.emplace_back(std::format("Line{}", ++count), std::format("\"{}\"", value));
             if (line.time) {
-                lines += std::format("Time{}={:.1f}", count, *line.time);
-                lines += '\0';
+                section.entries.emplace_back(std::format("Time{}", count), std::format("{:.1f}", *line.time));
             }
         }
-        auto section = std::format("Count={}", count);
-        section += '\0';
-        section += lines;
-        section += '\0';
-        if (!WritePrivateProfileSectionA(a_section, section.c_str(), path.c_str())) {
-            LogWriteFailure(a_section, path);
-        }
+        section.entries.front().second = std::to_string(count);
+        WriteSection(section, IniPath());
     }
 
     // The whole text as a finite float, or nothing.
@@ -161,32 +175,6 @@ namespace
             a_color[i] = static_cast<float>((rgba >> (24 - 8 * i)) & 0xFF) / 255.0F;
         }
     }
-
-    // One settings section, written whole like [Hidden] and [Durations]. A
-    // user's MO2 setup (MO2 2.5.2, game outside the instance) dropped every
-    // per-key WritePrivateProfileString without an error while section
-    // writes landed, so all sections go through the same call now.
-    struct Section
-    {
-        const char*                                      name;
-        std::vector<std::pair<std::string, std::string>> keys;
-    };
-
-    void WriteSection(const Section& a_section, const std::string& a_path)
-    {
-        std::string body;
-        for (const auto& [key, value] : a_section.keys) {
-            body += key;
-            body += '=';
-            body += value;
-            body += '\0';
-        }
-        body += '\0';
-        if (!WritePrivateProfileSectionA(a_section.name, body.c_str(), a_path.c_str())) {
-            LogWriteFailure(a_section.name, a_path);
-        }
-    }
-
 }
 
 namespace NT
@@ -254,14 +242,19 @@ namespace NT
         const auto  f = [](float a_value) { return std::format("{:.4f}", a_value); };
         const auto  b = [](bool a_value) { return std::string(a_value ? "1" : "0"); };
 
-        std::error_code ec;
-        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
-
         std::uint32_t rgba = 0;
         for (int i = 0; i < 4; ++i) {
             rgba |= static_cast<std::uint32_t>(std::lround(std::clamp(s.textColor[i], 0.0F, 1.0F) * 255.0F)) << (24 - 8 * i);
         }
-        std::vector<Section> sections{
+        Section center{ "CenterNotifications", {} };
+        for (std::size_t i = 0; i < kCenterGroups; ++i) {
+            const std::string key = kCenterKeys[i];
+            const auto&       c = s.center[i];
+            center.entries.emplace_back(key + "X", f(c.x));
+            center.entries.emplace_back(key + "Y", f(c.y));
+            center.entries.emplace_back(key + "Scale", f(c.scale));
+        }
+        const std::vector<Section> sections{
             { "General", { { "Enabled", b(s.enabled) }, { "VerboseLog", b(s.verboseLog) } } },
             { "Layout",
                 { { "PosX", f(s.posX) }, { "PosY", f(s.posY) }, { "Align", std::to_string(static_cast<int>(s.align)) },
@@ -278,29 +271,30 @@ namespace NT
                 { { "MergeYPS", b(s.mergeYps) }, { "MergeBoS", b(s.mergeBos) }, { "MergeGeneric", b(s.mergeGeneric) },
                     { "MergeWindow", f(s.mergeWindow) }, { "YPSLimit", std::to_string(s.ypsLimit) },
                     { "DrawIconFonts", b(s.drawIconFonts) } } },
-            { "CenterNotifications", {} },
+            center,
         };
-        for (std::size_t i = 0; i < kCenterGroups; ++i) {
-            const std::string key = kCenterKeys[i];
-            const auto&       c = s.center[i];
-            auto&             keys = sections.back().keys;
-            keys.emplace_back(key + "X", f(c.x));
-            keys.emplace_back(key + "Y", f(c.y));
-            keys.emplace_back(key + "Scale", f(c.scale));
-        }
         for (const auto& section : sections) {
             WriteSection(section, path);
         }
 
-        // Read one value back: a write that Windows reports as done but that
-        // never reaches the file (the case above) shows in the log.
+        // First save of a session: read every value back. A mismatch means
+        // the writes did not reach the file (#2). A match is no proof they
+        // persist (a redirect would answer the read too), only that this
+        // session can read what it wrote.
         static bool checked = false;
         if (!checked) {
             checked = true;
-            if (ReadString("Style", "FontSize1080", "", path) != f(s.fontSize)) {
-                logs::warn("Settings saved to {} could not be read back; they may last only until the game closes", path);
+            int mismatches = 0;
+            for (const auto& section : sections) {
+                for (const auto& [key, value] : section.entries) {
+                    mismatches += ReadString(section.name, key.c_str(), "\x01", path) != value ? 1 : 0;
+                }
+            }
+            if (mismatches > 0 || !std::filesystem::exists(path)) {
+                logs::warn("Settings written to {} but {} value(s) could not be read back; they may last only until the game closes",
+                    path, mismatches);
             } else {
-                logs::info("Settings saved to {}", path);
+                logs::info("Settings written to {} and read back", path);
             }
         }
         PublishCapture();
