@@ -79,6 +79,11 @@ namespace
     {
         std::error_code ec;
         std::filesystem::create_directories(std::filesystem::path(a_path).parent_path(), ec);
+        // Wine/Proton's profile API does not create a missing file (Nexus
+        // bug report, 1.4.1); an empty one is enough for it to write into.
+        if (!std::filesystem::exists(a_path, ec)) {
+            std::ofstream{ a_path, std::ios::app };
+        }
         std::string body;
         for (const auto& [key, value] : a_section.entries) {
             body += key;

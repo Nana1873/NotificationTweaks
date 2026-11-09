@@ -156,20 +156,28 @@ namespace
         return loaded;
     }
 
-    // Caller holds g_lock. The font for a_face, read on first use (normally
-    // at Preload); null when fontconfig.txt has no such face, no library
-    // defines it or reading it failed.
-    LoadedFont* Font(std::string_view a_face)
+    // The bytes of every fontlib in fontconfig.txt, in its order.
+    using Libraries = std::vector<std::pair<std::string, std::vector<std::uint8_t>>>;
+
+    // Game thread (BSResource): reads the libraries once for all faces.
+    Libraries ReadLibraries(const NT::SwfFont::FontConfig& a_config)
     {
-        const auto key = NT::Text::Lower(a_face);
-        if (const auto it = g_fonts.find(key); it != g_fonts.end()) {
-            return it->second.get();
+        Libraries libs;
+        for (const auto& lib : a_config.libs) {
+            libs.emplace_back(lib, ReadFile(lib));
         }
-        auto& slot = g_fonts[key];
+        return libs;
+    }
+
+    // Any thread, no lock: parses and rasterizes a_face from the libraries.
+    // Null when fontconfig.txt has no such face, no library defines it or
+    // reading it failed.
+    std::unique_ptr<LoadedFont> LoadFace(std::string_view a_face, const NT::SwfFont::FontConfig& a_config, const Libraries& a_libs)
+    {
         try {
-            const auto& config = Config();
+            const auto  key = NT::Text::Lower(a_face);
             std::string fontName;
-            for (const auto& [alias, name] : config.maps) {
+            for (const auto& [alias, name] : a_config.maps) {
                 if (NT::Text::Lower(alias) == key) {
                     fontName = name;
                     break;
@@ -179,21 +187,51 @@ namespace
                 logs::info("Icon font {}: not mapped in fontconfig.txt", a_face);
                 return nullptr;
             }
-            for (const auto& lib : config.libs) {
-                const auto data = ReadFile(lib);
+            for (const auto& [lib, data] : a_libs) {
                 if (auto font = NT::SwfFont::Load(data, fontName)) {
-                    slot = BuildAtlas(a_face, *font);
-                    logs::info("Icon font {}: {} glyph(s) from {} ({}), atlas {}x{}", a_face, slot->glyphs.size(), lib, fontName, kAtlasWidth,
-                        slot->atlasHeight);
-                    return slot.get();
+                    auto loaded = BuildAtlas(a_face, *font);
+                    logs::info("Icon font {}: {} glyph(s) from {} ({}), atlas {}x{}", a_face, loaded->glyphs.size(), lib, fontName, kAtlasWidth,
+                        loaded->atlasHeight);
+                    return loaded;
                 }
             }
             logs::warn("Icon font {}: font '{}' not found in any fontlib", a_face, fontName);
         } catch (const std::exception& e) {
-            slot.reset();
             logs::error("Icon font {}: reading failed ({})", a_face, e.what());
         }
         return nullptr;
+    }
+
+    // Set while Preload's worker builds the atlases; Has, Get and Found wait
+    // for it outside g_lock instead of loading the same face a second time.
+    // A promise, not std::async: that future's destructor would join the
+    // worker at unload, after the process already ended it.
+    std::shared_future<void> g_preload;
+
+    void WaitForPreload()
+    {
+        std::shared_future<void> preload;
+        {
+            std::scoped_lock lock{ g_lock };
+            preload = g_preload;
+        }
+        if (preload.valid()) {
+            preload.wait();
+        }
+    }
+
+    // Caller holds g_lock. The font for a_face, read on first use (normally
+    // at Preload); null when it is not available.
+    LoadedFont* Font(std::string_view a_face)
+    {
+        const auto key = NT::Text::Lower(a_face);
+        if (const auto it = g_fonts.find(key); it != g_fonts.end()) {
+            return it->second.get();
+        }
+        const auto& config = Config();
+        auto&       slot = g_fonts[key];
+        slot = LoadFace(a_face, config, ReadLibraries(config));
+        return slot.get();
     }
 
     // Caller holds g_lock; render thread.
@@ -248,16 +286,42 @@ namespace NT::IconFont
     void Preload()
     {
         std::scoped_lock lock{ g_lock };
-        const auto&      maps = Config().maps;
-        for (const auto& [alias, name] : maps) {
-            if (NT::Markup::IsIconFace(alias)) {
-                Font(alias);
+        if (g_preload.valid() && g_preload.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            return;
+        }
+        const auto&              config = Config();
+        std::vector<std::string> faces;
+        for (const auto& [alias, name] : config.maps) {
+            if (NT::Markup::IsIconFace(alias) && !g_fonts.contains(NT::Text::Lower(alias))) {
+                faces.push_back(alias);
             }
         }
+        if (faces.empty()) {
+            return;
+        }
+        // Reading stays here (BSResource); parsing and rasterizing (about
+        // 0.3 s with OII) run on a worker so the main menu is not held up.
+        auto               libs = ReadLibraries(config);
+        std::promise<void> done;
+        g_preload = done.get_future().share();
+        std::thread([faces = std::move(faces), config, libs = std::move(libs), done = std::move(done)]() mutable {
+            std::vector<std::pair<std::string, std::unique_ptr<LoadedFont>>> loaded;
+            for (const auto& face : faces) {
+                loaded.emplace_back(NT::Text::Lower(face), LoadFace(face, config, libs));
+            }
+            {
+                std::scoped_lock lock{ g_lock };
+                for (auto& [key, font] : loaded) {
+                    g_fonts.try_emplace(key, std::move(font));
+                }
+            }
+            done.set_value();
+        }).detach();
     }
 
     bool Has(std::string_view a_face, char32_t a_code)
     {
+        WaitForPreload();
         std::scoped_lock lock{ g_lock };
         const auto*      font = Font(a_face);
         return font && !font->textureFailed && font->glyphs.contains(a_code);
@@ -265,6 +329,7 @@ namespace NT::IconFont
 
     std::optional<GlyphImage> Get(std::string_view a_face, char32_t a_code, float a_pixelHeight)
     {
+        WaitForPreload();
         std::scoped_lock lock{ g_lock };
         auto*            font = Font(a_face);
         if (!font) {
@@ -288,6 +353,7 @@ namespace NT::IconFont
 
     std::vector<std::pair<std::string, std::size_t>> Found()
     {
+        WaitForPreload();
         std::scoped_lock                                 lock{ g_lock };
         std::vector<std::pair<std::string, std::size_t>> found;
         const auto&                                      maps = Config().maps;

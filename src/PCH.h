@@ -23,7 +23,9 @@
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <future>
 #include <mutex>
+#include <thread>
 
 namespace logs = SKSE::log;
 using namespace std::literals;

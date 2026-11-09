@@ -16,16 +16,19 @@ namespace NT::IconFont
         float                 aspect = 1.0F;  // width / height of the glyph box
     };
 
-    // Game thread at kDataLoaded: reads fontconfig.txt and loads every icon
-    // face it maps, so no font is read or rasterized during play.
+    // Game thread at kDataLoaded: reads fontconfig.txt and the font libraries
+    // it lists, then parses and rasterizes every icon face it maps on a
+    // worker thread, so neither the main menu nor play waits for it.
     void Preload();
 
     // Any thread: whether a_face has a drawable glyph for a_code. False once
     // the face's texture failed, so such lines fall back to the Vanilla HUD.
+    // Waits for a running Preload.
     bool Has(std::string_view a_face, char32_t a_code);
 
     // Render thread: the glyph rasterized closest above a_pixelHeight
-    // (creates the texture on first use). nullopt when unknown.
+    // (creates the texture on first use). nullopt when unknown. Waits for a
+    // running Preload.
     std::optional<GlyphImage> Get(std::string_view a_face, char32_t a_code, float a_pixelHeight);
 
     // Menu: every icon face in fontconfig.txt with its glyph count
