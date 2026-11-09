@@ -169,33 +169,32 @@ namespace
         return libs;
     }
 
-    // Any thread, no lock: parses and rasterizes a_face from the libraries.
-    // Null when fontconfig.txt has no such face, no library defines it or
-    // reading it failed.
-    std::unique_ptr<LoadedFont> LoadFace(std::string_view a_face, const NT::SwfFont::FontConfig& a_config, const Libraries& a_libs)
+    // The font name fontconfig.txt maps a_face to; empty when unmapped.
+    std::string MappedName(std::string_view a_face, const NT::SwfFont::FontConfig& a_config)
+    {
+        const auto key = NT::Text::Lower(a_face);
+        for (const auto& [alias, name] : a_config.maps) {
+            if (NT::Text::Lower(alias) == key) {
+                return name;
+            }
+        }
+        return {};
+    }
+
+    // Any thread, no lock: parses and rasterizes font a_fontName from the
+    // libraries. Null when no library defines it or reading it failed.
+    std::unique_ptr<LoadedFont> LoadFace(std::string_view a_face, const std::string& a_fontName, const Libraries& a_libs)
     {
         try {
-            const auto  key = NT::Text::Lower(a_face);
-            std::string fontName;
-            for (const auto& [alias, name] : a_config.maps) {
-                if (NT::Text::Lower(alias) == key) {
-                    fontName = name;
-                    break;
-                }
-            }
-            if (fontName.empty()) {
-                logs::info("Icon font {}: not mapped in fontconfig.txt", a_face);
-                return nullptr;
-            }
             for (const auto& [lib, data] : a_libs) {
-                if (auto font = NT::SwfFont::Load(data, fontName)) {
+                if (auto font = NT::SwfFont::Load(data, a_fontName)) {
                     auto loaded = BuildAtlas(a_face, *font);
-                    logs::info("Icon font {}: {} glyph(s) from {} ({}), atlas {}x{}", a_face, loaded->glyphs.size(), lib, fontName, kAtlasWidth,
+                    logs::info("Icon font {}: {} glyph(s) from {} ({}), atlas {}x{}", a_face, loaded->glyphs.size(), lib, a_fontName, kAtlasWidth,
                         loaded->atlasHeight);
                     return loaded;
                 }
             }
-            logs::warn("Icon font {}: font '{}' not found in any fontlib", a_face, fontName);
+            logs::warn("Icon font {}: font '{}' not found in any fontlib", a_face, a_fontName);
         } catch (const std::exception& e) {
             logs::error("Icon font {}: reading failed ({})", a_face, e.what());
         }
@@ -230,7 +229,13 @@ namespace
         }
         const auto& config = Config();
         auto&       slot = g_fonts[key];
-        slot = LoadFace(a_face, config, ReadLibraries(config));
+        // Any face named like an icon font gets here; an unmapped one must
+        // not read the libraries.
+        if (const auto fontName = MappedName(a_face, config); fontName.empty()) {
+            logs::info("Icon font {}: not mapped in fontconfig.txt", a_face);
+        } else {
+            slot = LoadFace(a_face, fontName, ReadLibraries(config));
+        }
         return slot.get();
     }
 
@@ -290,10 +295,10 @@ namespace NT::IconFont
             return;
         }
         const auto&              config = Config();
-        std::vector<std::string> faces;
+        std::vector<std::pair<std::string, std::string>> faces;  // alias, font name
         for (const auto& [alias, name] : config.maps) {
             if (NT::Markup::IsIconFace(alias) && !g_fonts.contains(NT::Text::Lower(alias))) {
-                faces.push_back(alias);
+                faces.emplace_back(alias, name);
             }
         }
         if (faces.empty()) {
@@ -304,10 +309,10 @@ namespace NT::IconFont
         auto               libs = ReadLibraries(config);
         std::promise<void> done;
         g_preload = done.get_future().share();
-        std::thread([faces = std::move(faces), config, libs = std::move(libs), done = std::move(done)]() mutable {
+        std::thread([faces = std::move(faces), libs = std::move(libs), done = std::move(done)]() mutable {
             std::vector<std::pair<std::string, std::unique_ptr<LoadedFont>>> loaded;
-            for (const auto& face : faces) {
-                loaded.emplace_back(NT::Text::Lower(face), LoadFace(face, config, libs));
+            for (const auto& [face, fontName] : faces) {
+                loaded.emplace_back(NT::Text::Lower(face), LoadFace(face, fontName, libs));
             }
             {
                 std::scoped_lock lock{ g_lock };
