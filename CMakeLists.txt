@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(NotificationTweaks VERSION 1.4.2 LANGUAGES CXX RC)
+project(NotificationTweaks VERSION 1.5.0 LANGUAGES CXX RC)
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -24,6 +24,7 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/SwfFont.cpp
         src/IconFont.cpp
         src/CenterNotifications.cpp
+        src/B612.cpp
 )
 
 # Windows version info (file properties), from the project version.

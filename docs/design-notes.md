@@ -46,6 +46,30 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   twice. Do not bring it back; the call-site hook makes it unnecessary.
   Vanilla never routes these lines through
   `HUDNotifications::ProcessMessage` or its native queue; both were tried.
+- B612 (Nexus 127701) NotificationManager (src/B612.*): mods register
+  texts in ActionScript (b612_notificationmanager.swf, injected into the
+  HUD movie as `_root.b612_notificationmanager`) to hide a line or get a
+  mod event for it (Feeding Perk Notification, Nexus 128242). B612 wraps
+  `MessagesBlock.Update` and scans Vanilla's `MessageArray`, which never
+  sees a line we take. So `Take` first reads B612's `searchItems` from the
+  HUD movie and applies its `isMatch` (exact `text`, or `before`/`after`
+  as start/end; first item wins): a match is not shown, is listed in the
+  history (like a line the player hid, and like with capture off) and,
+  with a callback, sends the SKSE mod event (callback, line, 0, no sender), as
+  `skse.SendModEvent` would. Disassembled from B612 1.0.27. Checked in
+  game: AE 1.7.104 with all five Feeding Perk Notification messages
+  shown through `Message.Show`; SE 1.5.97 and AE 1.6.1170 (test
+  instances, B612 + SkyUI added) with items registered through
+  `b612_NotificationManager.Register`/`EnclosesWith` (hide, exact with
+  event, before/after with event, a near miss and control lines). In a
+  loaded save (AE 1.7.104) Feeding Perk Notification's werewolf and
+  vampire lord announcements show with their icons and no line stays in
+  the notification area. In a coc session B612's Announcement widget
+  draws nothing even when called directly (SkyUI widget not set up
+  there), so test it from a save. Lines Vanilla shows
+  (capture off) reach B612 the normal way. Testing note: b612.esp needs
+  SkyUI_SE.esp as master; injecting the SWF by hand from DevBench does
+  not bind its class (no `onLoad`), use B612's own Papyrus calls.
 - `HUDNotifications::Update` (vfunc 0x1) is a second net: plain
   notification entries (no quest, no word of power) are taken out of the
   queue before Vanilla shows them. In every test so far all lines came

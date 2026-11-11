@@ -1,5 +1,6 @@
 #include "Capture.h"
 
+#include "B612.h"
 #include "CenterNotifications.h"
 #include "IconFont.h"
 #include "Settings.h"
@@ -240,8 +241,16 @@ namespace
 
     // Intercept and UpdateHook: hand the line to the overlay; when it is
     // taken, also clear the engine's repeat filter. False: Vanilla shows it.
+    // A line B612's NotificationManager claims is handled the way B612
+    // would (hidden, its mod event sent) and not shown, like with Vanilla;
+    // it is listed in the history like a line the player hid. The engine's
+    // repeat filter stays as Vanilla leaves it.
     bool Take(const char* a_text)
     {
+        if (NT::B612::Consume(a_text)) {
+            RecordOnly(a_text);
+            return true;
+        }
         if (!NT::Capture::Push(a_text)) {
             return false;
         }

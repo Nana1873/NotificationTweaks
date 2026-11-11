@@ -3,6 +3,7 @@
 // atlas level choice. Built with the plugin; tools\build.ps1 runs
 // the exe and fails the build when a check fails.
 
+#include "B612.h"
 #include "Markup.h"
 #include "Merge.h"
 #include "SwfFont.h"
@@ -214,6 +215,40 @@ namespace
             }
         }
     }
+    // B612 NotificationManager.isMatch (b612_notificationmanager.swf).
+    void TestB612()
+    {
+        using NT::B612::FindMatch;
+        using NT::B612::Item;
+        const std::vector<Item> items{
+            { .text = "Bloodlust extended", .callback = "" },
+            { .text = "You can now pick a new perk", .callback = "onPerk" },
+            { .before = "Feeding: ", .after = " points", .callback = "onFeed" },
+            { .before = "Only start", .after = std::nullopt, .callback = "x" },
+        };
+        CHECK(FindMatch(items, "Bloodlust extended") == &items[0]);
+        CHECK(FindMatch(items, "Bloodlust extended!") == nullptr);  // exact, not a prefix
+        CHECK(FindMatch(items, "You can now pick a new perk")->callback == "onPerk");
+        CHECK(FindMatch(items, "Feeding: 3 points") == &items[2]);
+        CHECK(FindMatch(items, "Feeding: 3 pointsx") == nullptr);
+        CHECK(FindMatch(items, "Feeding: points") == &items[2]);  // overlap: B612 does not check either
+        CHECK(FindMatch(items, " points") == nullptr);           // shorter than before
+        CHECK(FindMatch(items, "Only start here") == nullptr);   // after undefined
+        CHECK(FindMatch(items, "") == nullptr);
+        const std::vector<Item> longEnds{ { .before = "a", .after = "much longer than the line", .callback = "" },
+            { .before = "much longer than the line", .after = "", .callback = "" } };
+        CHECK(FindMatch(longEnds, "a line") == nullptr);
+        const std::vector<Item> emptyText{ { .text = "", .callback = "" } };  // never built by addItem
+        CHECK(FindMatch(emptyText, "") == &emptyText[0]);
+        CHECK(FindMatch(emptyText, "x") == nullptr);
+        CHECK(FindMatch({}, "Bloodlust extended") == nullptr);
+        // First match wins, like the AS2 loop.
+        const std::vector<Item> twice{ { .text = "a", .callback = "first" }, { .text = "a", .callback = "second" } };
+        CHECK(FindMatch(twice, "a")->callback == "first");
+        // An empty before/after pair (EnclosesWith with no args) matches every line.
+        const std::vector<Item> all{ { .before = "", .after = "", .callback = "" } };
+        CHECK(FindMatch(all, "anything") == &all[0]);
+    }
 }
 
 int main()
@@ -223,6 +258,7 @@ int main()
     TestMarkup();
     TestMerge();
     TestSwfFont();
+    TestB612();
     std::cout << std::format("[tests] {} passed, {} failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }
