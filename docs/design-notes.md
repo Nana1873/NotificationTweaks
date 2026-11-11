@@ -188,7 +188,9 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   and AE 1.6.1170 with SkyUILib's list menu filled through
   `UILIB_1.ListMenu_SetData`: no line over the menu, lines (also one sent
   while it was open) appear after closing and fade; message box
-  unchanged.
+  unchanged. Same result on SE 1.5.97 with the menu from the report,
+  Skyrim Unbound Immersive Choice (Nexus 191678), which opens its own SWF
+  through `UI.OpenCustomMenu("skyrimunboundorigins")`.
 - Layout editor ("Edit layout..." on the Display page): an SMF window
   (`AddWindow`) with Done replaces the main window. A yellow frame around
   the lines and a labelled box per center group (see Center
