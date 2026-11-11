@@ -173,6 +173,22 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   paused there; frozen at age 0 they stayed invisible (fade-in alpha 0)
   until the menu closed. Verified in the barter menu without Skyrim Souls
   RE (AE 1.6.1170): `HudVisible` does not block there, the line shows.
+  Since 1.4.4 any other menu in `UI::menuStack` that pauses the game
+  counts as well (mod menus: SKSE's `CustomMenu`, used by SkyUILib's list
+  menu in Skyrim Unbound Reborn). Before, lines were drawn over such a
+  menu and never aged (paused, not on the list). Left out, so they behave
+  as before (lines visible and paused): the small vanilla popups and
+  panels that pause, message box, tutorial and favorites (review finding:
+  without the exclusion lines would vanish every time Favorites opens),
+  and everything while an SMF window is open (its preview lines). Only
+  the message box exclusion was seen in game; DevBench could not open
+  Favorites or a tutorial, they use the same pointer check.
+  A mod menu that Skyrim Souls RE unpauses is not detected; lines are
+  then drawn over it but age normally. Verified on AE 1.7.104, SE 1.5.97
+  and AE 1.6.1170 with SkyUILib's list menu filled through
+  `UILIB_1.ListMenu_SetData`: no line over the menu, lines (also one sent
+  while it was open) appear after closing and fade; message box
+  unchanged.
 - Layout editor ("Edit layout..." on the Display page): an SMF window
   (`AddWindow`) with Done replaces the main window. A yellow frame around
   the lines and a labelled box per center group (see Center

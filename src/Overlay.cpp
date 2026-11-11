@@ -294,8 +294,14 @@ namespace
         return ImGuiMCP::ColorConvertFloat4ToU32({ a_settings.textColor[0], a_settings.textColor[1], a_settings.textColor[2], alpha });
     }
 
-    // Full-screen menus the lines would be drawn over. Checked by name, not
-    // by GameIsPaused: Skyrim Souls and similar mods keep these unpaused.
+    // Menus the lines would be drawn over. The vanilla ones are checked by
+    // name, not by GameIsPaused: Skyrim Souls and similar mods keep these
+    // unpaused. Any other menu that pauses the game counts too, so mod menus
+    // (SKSE's CustomMenu, used by SkyUILib and Skyrim Unbound Reborn) do not
+    // get lines drawn over them that never age. Left out, as before: small
+    // vanilla popups and panels (message box, tutorial, favorites), where
+    // the lines keep showing (paused), and everything while the framework's
+    // settings window is open (it keeps its preview lines).
     bool FullScreenMenuOpen(RE::UI* a_ui)
     {
         static constexpr std::string_view kMenus[] = { RE::InventoryMenu::MENU_NAME, RE::MagicMenu::MENU_NAME,
@@ -303,7 +309,18 @@ namespace
             RE::GiftMenu::MENU_NAME, RE::JournalMenu::MENU_NAME, RE::TweenMenu::MENU_NAME, RE::CraftingMenu::MENU_NAME,
             RE::LockpickingMenu::MENU_NAME, RE::BookMenu::MENU_NAME, RE::SleepWaitMenu::MENU_NAME, RE::TrainingMenu::MENU_NAME,
             RE::LevelUpMenu::MENU_NAME, RE::Console::MENU_NAME, RE::RaceSexMenu::MENU_NAME };
-        return std::ranges::any_of(kMenus, [&](std::string_view a_name) { return a_ui->IsMenuOpen(a_name); });
+        if (std::ranges::any_of(kMenus, [&](std::string_view a_name) { return a_ui->IsMenuOpen(a_name); })) {
+            return true;
+        }
+        if (SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
+            return false;
+        }
+        const RE::GPtr<RE::IMenu> popups[] = { a_ui->GetMenu(RE::MessageBoxMenu::MENU_NAME),
+            a_ui->GetMenu(RE::TutorialMenu::MENU_NAME), a_ui->GetMenu(RE::FavoritesMenu::MENU_NAME) };
+        return std::ranges::any_of(a_ui->menuStack, [&](const RE::GPtr<RE::IMenu>& a_menu) {
+            return a_menu && a_menu->PausesGame() &&
+                   std::ranges::none_of(popups, [&](const RE::GPtr<RE::IMenu>& a_popup) { return a_menu == a_popup; });
+        });
     }
 
     bool HudVisible(RE::UI* a_ui)
