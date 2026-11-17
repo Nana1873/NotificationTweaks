@@ -100,11 +100,18 @@ namespace
     }
 
     // The text as the Vanilla text field would show it: a lone "$Key" goes
-    // through the Scaleform translator (unknown keys stay as sent).
+    // through the Scaleform translator (unknown keys stay as sent). So does
+    // "$Key{argument}" (Whose Quest is it Anyway: "$WHQA_Msg00{Quest name}",
+    // translated as "$WHQA_Msg00{}" with the argument put in for "{}");
+    // the argument may contain spaces, the key may not.
     std::string Resolve(std::string_view a_raw)
     {
-        if (a_raw.size() > 1 && a_raw.front() == '$' && a_raw.find(' ') == std::string_view::npos) {
-            return NT::Translation::Translate(a_raw, a_raw);
+        if (a_raw.size() > 1 && a_raw.front() == '$') {
+            const auto open = a_raw.find('{');
+            const auto key = a_raw.substr(0, open);
+            if (key.find(' ') == std::string_view::npos && (open == std::string_view::npos || a_raw.back() == '}')) {
+                return NT::Translation::Translate(a_raw, a_raw);
+            }
         }
         return std::string(a_raw);
     }

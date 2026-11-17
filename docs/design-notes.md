@@ -86,7 +86,17 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   overlay and the history page copy them out before drawing.
 - A notification that is exactly one `$Key` is translated through the
   Scaleform translator (read-only), like the Vanilla text field does
-  (seen: `$Initialization_Start` from Racial Skin Variance).
+  (seen: `$Initialization_Start` from Racial Skin Variance). So is
+  `$Key{argument}` (1.4.5, Whose Quest is it Anyway NG sends
+  `$WHQA_Msg00{<quest name>}`, its file has `$WHQA_Msg00{}`): the
+  argument may contain spaces, the key may not. CommonLib's
+  `SKSE::Translation::Translate` looks up `$Key{}` and fills in the
+  argument; an unknown key comes back as the text without its outer
+  braces, which counts as untranslated, so the line stays as sent.
+  Verified 2026-11-17 on SE 1.5.97 and AE 1.6.1170 with
+  ScaleformTranslationPP 1.10 and WHQA NG 1.6 (`$Nope{a b}`, `$NT_Done`,
+  `$100 gold found` checked as well). Not run on 1.7.104: the main list
+  has no STPP.
 - Pending lines are dropped at `kPreLoadGame` / `kNewGame`. Loading
   screens inside a session keep them: the overlay neither draws nor ages
   lines while `Loading Menu` is open or the HUD movie is hidden.
