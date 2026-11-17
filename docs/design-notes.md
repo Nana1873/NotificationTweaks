@@ -98,8 +98,8 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   `$Nope{$NT_Done}` and `$Nope{a}{{}}`, found in review).
   Verified 2026-11-17 on SE 1.5.97 and AE 1.6.1170 with
   ScaleformTranslationPP 1.10 and WHQA NG 1.6 (`$Nope{a b}`, `$NT_Done`,
-  `$100 gold found` checked as well). Not run on 1.7.104: the main list
-  has no STPP.
+  `$100 gold found` checked as well), and on AE 1.7.104 in
+  `E:\Modlisten\Skyrim` with the same two mods added for the run only.
 - Pending lines are dropped at `kPreLoadGame` / `kNewGame`. Loading
   screens inside a session keep them: the overlay neither draws nor ages
   lines while `Loading Menu` is open or the HUD movie is hidden.
