@@ -118,23 +118,22 @@ namespace
         // translationMap directly walked foreign memory and crashed on a
         // key nobody translates (1.0.0, SE 1.5.97, "$qlie_..." key).
         // "$Key{argument}" is looked up as "$Key{}" and the argument goes
-        // into its "{}". A translator that does not know the key hands
-        // "$Key{}" back unchanged, so CommonLib returns the text with only
-        // the outer braces gone ("$Nope{a b}" became "$Nopea b"); that
-        // counts as not translated.
-        std::string unbraced;
-        int         depth = 0;
-        for (const char c : a_key) {
-            if (c == '{' && depth++ == 0) {
-                continue;
+        // into its "{}" (NT::Text::EmptyArguments). A translator that does
+        // not know "$Key{}" hands it back unchanged and CommonLib still
+        // fills in the arguments ("$Nope{a b}" became "$Nopea b"), so first
+        // ask for the key with empty arguments: unknown, it comes back with
+        // its braces gone ("$Nope{}" -> "$Nope").
+        if (a_key.find('{') != std::string_view::npos) {
+            const auto bare = NT::Text::EmptyArguments(a_key);
+            auto       echo = bare;
+            std::erase_if(echo, [](char a_c) { return a_c == '{' || a_c == '}'; });
+            if (std::string result; !SKSE::Translation::Translate(bare, result) || result.empty() || result == bare ||
+                                    result == echo) {
+                return std::nullopt;
             }
-            if (c == '}' && depth > 0 && --depth == 0) {
-                continue;
-            }
-            unbraced += c;
         }
         if (std::string result; SKSE::Translation::Translate(std::string(a_key), result) && !result.empty() &&
-                                result != a_key && result != unbraced) {
+                                result != a_key) {
             return result;
         }
         return std::nullopt;

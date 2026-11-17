@@ -1,5 +1,5 @@
 // Unit tests for the pure parts of the plugin: merge rules, markup parsing,
-// hide keys, INI escaping, fontconfig parsing, the SWF glyph rasterizer and
+// hide keys, INI escaping, translation keys, fontconfig parsing, the SWF glyph rasterizer and
 // atlas level choice. Built with the plugin; tools\build.ps1 runs
 // the exe and fails the build when a check fails.
 
@@ -56,6 +56,24 @@ namespace
         CHECK(Trim("  \tx y\t ") == "x y");
         CHECK(Trim("   ").empty());
         CHECK(Lower("\xC3\x84" "BC") == "\xC3\xA4" "bc");
+
+        CHECK(IsTranslationKey("$NT_Done"));
+        CHECK(IsTranslationKey("$WHQA_Msg00{Return to Grace}"));
+        CHECK(IsTranslationKey("$K{a}{b c}"));
+        CHECK(!IsTranslationKey("$100 gold found"));
+        CHECK(!IsTranslationKey("$Key{a} more"));
+        CHECK(!IsTranslationKey("$Key{abc"));
+        CHECK(!IsTranslationKey("$"));
+        CHECK(!IsTranslationKey("$ "));
+        CHECK(!IsTranslationKey("Plain line with {braces}"));
+
+        CHECK(EmptyArguments("$NT_Done") == "$NT_Done");
+        CHECK(EmptyArguments("$WHQA_Msg00{Return to Grace}") == "$WHQA_Msg00{}");
+        CHECK(EmptyArguments("$K{a}{b c}") == "$K{}{}");
+        CHECK(EmptyArguments("$K{$Other}") == "$K{}");
+        CHECK(EmptyArguments("$K{x{}}") == "$K{}");
+        CHECK(EmptyArguments("$K{a}{{}}") == "$K{}{}");
+        CHECK(EmptyArguments("$K{}") == "$K{}");
 
         std::string utf8;
         AppendUtf8(0x1F600, utf8);

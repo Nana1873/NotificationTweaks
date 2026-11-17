@@ -155,6 +155,45 @@ namespace NT::Text
         return out;
     }
 
+    // Whether a notification is a translation key the Vanilla text field
+    // would translate: "$Key", or "$Key{argument}..." ending in '}' (Whose
+    // Quest is it Anyway NG sends "$WHQA_Msg00{Return to Grace}"). The
+    // arguments may contain spaces, the key may not, so "$100 gold found"
+    // stays plain text.
+    inline bool IsTranslationKey(std::string_view a_text)
+    {
+        if (a_text.size() < 2 || a_text.front() != '$') {
+            return false;
+        }
+        const auto open = a_text.find('{');
+        return a_text.substr(0, open).find(' ') == std::string_view::npos &&
+               (open == std::string_view::npos || a_text.back() == '}');
+    }
+
+    // The key with every outer "{...}" argument emptied: "$K{a}{b c}" ->
+    // "$K{}{}". That is the key SKSE::Translation::Translate (CommonLib,
+    // src/SKSE/Translation.cpp) looks up before it puts the arguments
+    // into the "{}" of the result.
+    inline std::string EmptyArguments(std::string_view a_key)
+    {
+        std::string out;
+        int         depth = 0;
+        for (const char c : a_key) {
+            if (c == '{') {
+                if (depth++ == 0) {
+                    out += c;
+                }
+            } else if (c == '}' && depth > 0) {
+                if (--depth == 0) {
+                    out += c;
+                }
+            } else if (depth == 0) {
+                out += c;
+            }
+        }
+        return out;
+    }
+
     // Reverses PercentEscape; a '%' without two hex digits stays as it is.
     inline std::string PercentUnescape(std::string_view a_text)
     {
