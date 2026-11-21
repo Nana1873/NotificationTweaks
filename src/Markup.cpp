@@ -52,7 +52,13 @@ namespace
             a_value.remove_prefix(2);
         }
         std::uint32_t rgb = 0;
-        if (a_value.size() != 6 || std::from_chars(a_value.data(), a_value.data() + 6, rgb, 16).ec != std::errc{}) {
+        if (a_value.size() != 6) {
+            return std::nullopt;
+        }
+        // All six digits: from_chars stops at the first other character
+        // without an error ("12GGGG" read as 0x12).
+        const auto [ptr, ec] = std::from_chars(a_value.data(), a_value.data() + 6, rgb, 16);
+        if (ec != std::errc{} || ptr != a_value.data() + 6) {
             return std::nullopt;
         }
         return rgb;
@@ -250,6 +256,19 @@ namespace NT::Markup
         const auto lower = NT::Text::LowerAscii(trimmed);
         if (!lower.starts_with("<font") || !lower.ends_with("</font>")) {
             return std::nullopt;
+        }
+        // The first <font> must be the one the last </font> closes: two
+        // spans side by side ("<font>a</font> and <font>b</font>") are not
+        // one wrapped text.
+        constexpr std::size_t kCloseLength = sizeof("</font>") - 1;
+        int                   depth = 0;
+        for (auto pos = lower.find('<'); pos != std::string::npos; pos = lower.find('<', pos + 1)) {
+            const auto tag = std::string_view(lower).substr(pos + 1);
+            if (tag.starts_with("font")) {
+                ++depth;
+            } else if (tag.starts_with("/font") && --depth <= 0 && pos + kCloseLength != lower.size()) {
+                return std::nullopt;
+            }
         }
         const auto end = trimmed.find('>');
         const auto color = Attribute(trimmed.substr(1, end - 1), "color");

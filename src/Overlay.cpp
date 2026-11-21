@@ -302,6 +302,43 @@ namespace
     // vanilla popups and panels (message box, tutorial, favorites), where
     // the lines keep showing (paused), and everything while the framework's
     // settings window is open (it keeps its preview lines).
+    //
+    // The pausing menus are looked up in a UI task after every menu opened
+    // or closed, not here: this runs on the framework's render callback,
+    // and the game changes UI::menuStack while it opens and closes menus.
+    std::atomic<bool> g_pausingMenuOpen{ false };
+
+    // UI task: a menu other than the small popups pauses the game.
+    void UpdatePausingMenuOpen()
+    {
+        auto* ui = RE::UI::GetSingleton();
+        if (!ui) {
+            return;
+        }
+        const RE::GPtr<RE::IMenu> popups[] = { ui->GetMenu(RE::MessageBoxMenu::MENU_NAME),
+            ui->GetMenu(RE::TutorialMenu::MENU_NAME), ui->GetMenu(RE::FavoritesMenu::MENU_NAME) };
+        const bool open = std::ranges::any_of(ui->menuStack, [&](const RE::GPtr<RE::IMenu>& a_menu) {
+            return a_menu && a_menu->PausesGame() &&
+                   std::ranges::none_of(popups, [&](const RE::GPtr<RE::IMenu>& a_popup) { return a_menu == a_popup; });
+        });
+        if (g_pausingMenuOpen.exchange(open) != open) {
+            logs::debug("Pausing menu {}", open ? "open" : "closed");
+        }
+    }
+
+    // As a task, so the stack is read once the game is done changing it,
+    // whether the event comes before or after that.
+    class MenuWatcher final : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
+    {
+    public:
+        RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent*, RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override
+        {
+            SKSE::GetTaskInterface()->AddUITask(UpdatePausingMenuOpen);
+            return RE::BSEventNotifyControl::kContinue;
+        }
+    };
+    MenuWatcher g_menuWatcher;
+
     bool FullScreenMenuOpen(RE::UI* a_ui)
     {
         static constexpr std::string_view kMenus[] = { RE::InventoryMenu::MENU_NAME, RE::MagicMenu::MENU_NAME,
@@ -315,12 +352,7 @@ namespace
         if (SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
             return false;
         }
-        const RE::GPtr<RE::IMenu> popups[] = { a_ui->GetMenu(RE::MessageBoxMenu::MENU_NAME),
-            a_ui->GetMenu(RE::TutorialMenu::MENU_NAME), a_ui->GetMenu(RE::FavoritesMenu::MENU_NAME) };
-        return std::ranges::any_of(a_ui->menuStack, [&](const RE::GPtr<RE::IMenu>& a_menu) {
-            return a_menu && a_menu->PausesGame() &&
-                   std::ranges::none_of(popups, [&](const RE::GPtr<RE::IMenu>& a_popup) { return a_menu == a_popup; });
-        });
+        return g_pausingMenuOpen;
     }
 
     bool HudVisible(RE::UI* a_ui)
@@ -667,7 +699,7 @@ namespace
         auto&      s = NT::Config();
         const bool positioning = g_positioning.load();
         if (!s.enabled && !positioning) {
-            NT::Capture::ClearActive();  // no stale lines when it is switched back on
+            NT::Capture::ClearActive("plugin switched off");  // no stale lines when it is switched back on
             return;
         }
         if (!positioning && !HudVisible(ui)) {
@@ -711,6 +743,10 @@ namespace NT::Overlay
 {
     void Initialize()
     {
+        if (auto* ui = RE::UI::GetSingleton()) {
+            ui->AddEventSink<RE::MenuOpenCloseEvent>(&g_menuWatcher);
+            SKSE::GetTaskInterface()->AddUITask(UpdatePausingMenuOpen);  // the menus open right now
+        }
         SKSEMenuFramework::AddHudElement(Render);
         logs::info("Registered HUD element");
     }

@@ -100,36 +100,50 @@ namespace
             boxes.push_back(box);
         }
 
-        // Layout pass: rows per level, one level after the other.
+        // Layout pass: rows per level, one level after the other. Places the
+        // first a_count glyphs at every level and returns the height used.
         std::vector<AtlasGlyph> placed(boxes.size());
-        std::size_t             fitting = boxes.size();
-        int                     y = 0;
-        for (std::size_t level = 0; level < std::size(kLevels); ++level) {
-            const int   height = kLevels[level];
-            const float scale = height / emHeight;
-            int         x = 0;
-            for (std::size_t i = 0; i < fitting; ++i) {
-                const int width = std::clamp(static_cast<int>(std::ceil((boxes[i].right - boxes[i].left) * scale)), 1, kAtlasWidth - 2 * kPadding);
-                if (x + width + 2 * kPadding > kAtlasWidth) {
-                    x = 0;
-                    y += height + 2 * kPadding;
+        const auto              layout = [&](std::size_t a_count) {
+            int y = 0;
+            for (std::size_t level = 0; level < std::size(kLevels); ++level) {
+                const int   height = kLevels[level];
+                const float scale = height / emHeight;
+                int         x = 0;
+                for (std::size_t i = 0; i < a_count; ++i) {
+                    const int width = std::clamp(static_cast<int>(std::ceil((boxes[i].right - boxes[i].left) * scale)), 1, kAtlasWidth - 2 * kPadding);
+                    if (x + width + 2 * kPadding > kAtlasWidth) {
+                        x = 0;
+                        y += height + 2 * kPadding;
+                    }
+                    placed[i].x[level] = x + kPadding;
+                    placed[i].y[level] = y + kPadding;
+                    placed[i].width[level] = width;
+                    placed[i].aspect = (boxes[i].right - boxes[i].left) / emHeight;
+                    x += width + 2 * kPadding;
                 }
-                if (y + height + 2 * kPadding > kMaxAtlasHeight) {
-                    fitting = i;  // later glyphs get no slot at any level
-                    break;
-                }
-                placed[i].x[level] = x + kPadding;
-                placed[i].y[level] = y + kPadding;
-                placed[i].width[level] = width;
-                placed[i].aspect = (boxes[i].right - boxes[i].left) / emHeight;
-                x += width + 2 * kPadding;
+                y += height + 2 * kPadding;
             }
-            y += height + 2 * kPadding;
-        }
-        if (fitting < boxes.size()) {
+            return y;
+        };
+        // The most glyphs that fit at all levels together (the height grows
+        // with the count). Cutting level by level instead left a level that
+        // started past the limit with no glyph, and so the font with none.
+        std::size_t fitting = boxes.size();
+        if (layout(fitting) > kMaxAtlasHeight) {
+            std::size_t low = 0;
+            std::size_t high = fitting;
+            while (low < high) {
+                const auto middle = low + (high - low + 1) / 2;
+                if (layout(middle) <= kMaxAtlasHeight) {
+                    low = middle;
+                } else {
+                    high = middle - 1;
+                }
+            }
+            fitting = low;
             logs::warn("Icon font {}: atlas full, {} of {} glyph(s) kept", a_face, fitting, boxes.size());
         }
-        loaded->atlasHeight = std::min(y, kMaxAtlasHeight);
+        loaded->atlasHeight = layout(fitting);
 
         // Raster pass.
         loaded->rgba.assign(static_cast<std::size_t>(kAtlasWidth) * static_cast<std::size_t>(loaded->atlasHeight) * 4, 255);

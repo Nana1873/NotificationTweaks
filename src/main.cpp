@@ -33,7 +33,7 @@ namespace
     {
         if (a_message->type == SKSE::MessagingInterface::kPreLoadGame || a_message->type == SKSE::MessagingInterface::kNewGame) {
             if (g_active) {
-                NT::Capture::ClearActive();
+                NT::Capture::ClearActive("previous session");
             }
             return;
         }

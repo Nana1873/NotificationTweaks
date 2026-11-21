@@ -159,15 +159,34 @@ namespace NT::Text
     // would translate: "$Key", or "$Key{argument}..." ending in '}' (Whose
     // Quest is it Anyway NG sends "$WHQA_Msg00{Return to Grace}"). The
     // arguments may contain spaces, the key may not, so "$100 gold found"
-    // stays plain text.
+    // stays plain text. The braces must pair up: with a stray one
+    // ("$Nope{a}}") CommonLib's Translate and EmptyArguments disagree and
+    // an unknown key came out mangled ("$Nopea}").
     inline bool IsTranslationKey(std::string_view a_text)
     {
         if (a_text.size() < 2 || a_text.front() != '$') {
             return false;
         }
         const auto open = a_text.find('{');
-        return a_text.substr(0, open).find(' ') == std::string_view::npos &&
-               (open == std::string_view::npos || a_text.back() == '}');
+        const auto key = a_text.substr(0, open);
+        if (key.find(' ') != std::string_view::npos) {
+            return false;
+        }
+        if (open == std::string_view::npos) {
+            return true;
+        }
+        if (key.find('}') != std::string_view::npos || a_text.back() != '}') {
+            return false;
+        }
+        int depth = 0;
+        for (const char c : a_text.substr(open)) {
+            if (c == '{') {
+                ++depth;
+            } else if (c == '}' && --depth < 0) {
+                return false;
+            }
+        }
+        return depth == 0;
     }
 
     // The key with every outer "{...}" argument emptied: "$K{a}{b c}" ->

@@ -177,8 +177,12 @@ namespace NT::Merge
         const auto      dir = std::filesystem::absolute("Data/SKSE/Plugins/ypsThoughts", ec);
         std::size_t     files = 0;
         if (!ec && std::filesystem::is_directory(dir, ec)) {
-            for (const auto& item : std::filesystem::directory_iterator(dir, ec)) {
-                if (!item.is_regular_file() || item.path().extension() != ".json") {
+            // Error codes all the way: a throwing step here (an entry that
+            // cannot be read) would end the game at kDataLoaded.
+            for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+                const auto&     item = *it;
+                std::error_code itemError;
+                if (!item.is_regular_file(itemError) || itemError || item.path().extension() != ".json") {
                     continue;
                 }
                 std::ifstream file(item.path(), std::ios::binary);

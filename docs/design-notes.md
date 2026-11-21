@@ -56,7 +56,22 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   as start/end; first item wins): a match is not shown, is listed in the
   history (like a line the player hid, and like with capture off) and,
   with a callback, sends the SKSE mod event (callback, line, 0, no sender), as
-  `skse.SendModEvent` would. Disassembled from B612 1.0.27. Checked in
+  `skse.SendModEvent` would. Repeats of a claimed line stack onto its
+  history row (stacking on; no time limit, a claimed line has no
+  lifetime). The engine's repeat filter keeps the entries it held at the
+  claim for its 5 s window, through the clears after other lines:
+  cleared, a repeat Vanilla drops would get through and send the mod
+  event twice. Limits: a line taken between the claimed line's send and
+  its claim has already cleared that entry, and a normal line sent in
+  the same batch is kept too, so its repeats are dropped by the engine
+  for 5 s instead of stacking. An item with an empty `text` goes by
+  `before`/`after` (`EnclosesWith` passes "" as the text). Checked
+  2026-11-21 on SE 1.5.97 and AE 1.6.1170 through DevBench (item
+  registered with an event, `Debug.Notification` 1 s apart): claimed
+  line, other line, claimed line sent the mod event twice on 1.4.5 and
+  once with the fix; after 6 s it is sent again; repeats log "stacked in
+  the history"; an `EnclosesWith` item matches, its near miss shows.
+  Disassembled from B612 1.0.27. Checked in
   game: AE 1.7.104 with all five Feeding Perk Notification messages
   shown through `Message.Show`; SE 1.5.97 and AE 1.6.1170 (test
   instances, B612 + SkyUI added) with items registered through
@@ -89,7 +104,8 @@ them itself on the SKSE Menu Framework HUD layer. Verified on Skyrim SE
   (seen: `$Initialization_Start` from Racial Skin Variance). So is
   `$Key{argument}` (1.4.5, Whose Quest is it Anyway NG sends
   `$WHQA_Msg00{<quest name>}`, its file has `$WHQA_Msg00{}`): the
-  argument may contain spaces, the key may not (`Text::IsTranslationKey`).
+  argument may contain spaces, the key may not, and the braces must pair
+  up (`Text::IsTranslationKey`; `$Nope{a}}` came out as `$Nopea}`).
   CommonLib's `SKSE::Translation::Translate` looks up `$Key{}` and fills
   in the arguments, even when the translator does not know the key and
   hands it back. So `Lookup` first asks for the key with empty arguments
@@ -189,7 +205,14 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   Since 1.4.4 any other menu in `UI::menuStack` that pauses the game
   counts as well (mod menus: SKSE's `CustomMenu`, used by SkyUILib's list
   menu in Skyrim Unbound Reborn). Before, lines were drawn over such a
-  menu and never aged (paused, not on the list). Left out, so they behave
+  menu and never aged (paused, not on the list). The stack is read in an
+  SKSE UI task queued on every `MenuOpenCloseEvent` and published as an
+  atomic flag; the overlay (render callback) must not walk the array
+  itself while the game opens and closes menus (changed after 1.4.5;
+  checked 2026-11-21 on SE 1.5.97 and AE 1.6.1170 with VerboseLog:
+  "Pausing menu open"/"closed" for the main menu and for SkyUILib's list
+  menu, nothing for a message box; the task runs while the game is
+  paused). Left out, so they behave
   as before (lines visible and paused): the small vanilla popups and
   panels that pause, message box, tutorial and favorites (review finding:
   without the exclusion lines would vanish every time Favorites opens),
@@ -275,7 +298,9 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   overlay samples the level closest above its line height, because the
   menu framework's sampler has no mipmaps. The D3D11 texture is created
   on the render thread on first draw; if that fails, `Has()` turns false
-  and such lines go back to Vanilla. Glyph boxes include outline parts
+  and such lines go back to Vanilla. A font too large for the atlas keeps
+  the most glyphs that fit at all three levels together (cutting level by
+  level left it with none). Glyph boxes include outline parts
   outside the advance. The overlay draws each glyph with `AddImage`, one
   line high, tinted like text, with the same shadow/outline.
 - Nothing ships from OII: the font is read from the player's install.

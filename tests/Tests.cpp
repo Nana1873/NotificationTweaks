@@ -66,6 +66,12 @@ namespace
         CHECK(!IsTranslationKey("$"));
         CHECK(!IsTranslationKey("$ "));
         CHECK(!IsTranslationKey("Plain line with {braces}"));
+        CHECK(IsTranslationKey("$K{x{}}"));
+        CHECK(IsTranslationKey("$K{a}x{b}"));
+        CHECK(!IsTranslationKey("$Nope{a}}"));  // stray braces: CommonLib mangles an unknown key
+        CHECK(!IsTranslationKey("$K{a}b}"));
+        CHECK(!IsTranslationKey("$K}{a}"));
+        CHECK(!IsTranslationKey("$K{a{b}"));
 
         CHECK(EmptyArguments("$NT_Done") == "$NT_Done");
         CHECK(EmptyArguments("$WHQA_Msg00{Return to Grace}") == "$WHQA_Msg00{}");
@@ -100,6 +106,10 @@ namespace
         CHECK(WrappingColor("<FONT COLOR=0x00FF00>x</FONT>") == 0x00FF00u);
         CHECK(!WrappingColor("<font bgcolor=\"#123456\">x</font>"));
         CHECK(!WrappingColor("<font color=\"#FF00FF\">x</font> tail"));
+        CHECK(!WrappingColor("<font color=\"#FF00FF\">a</font> and <font color=\"#00FF00\">b</font>"));  // two spans
+        CHECK(WrappingColor("<font color=\"#FF00FF\">a <font color=\"#00FF00\">b</font> c</font>") == 0xFF00FFu);
+        CHECK(!WrappingColor("<font color=\"#12GGGG\">x</font>"));  // not six hex digits
+        CHECK(!Parse("<font color=\"#12GGGG\">x</font>").front().rgb);
 
         CHECK(ToUtf8("\xE4") == "\xC3\xA4");             // Windows-1252 fallback
         CHECK(ToUtf8("\xC3\xA4") == "\xC3\xA4");         // valid UTF-8 stays
@@ -256,9 +266,12 @@ namespace
         const std::vector<Item> longEnds{ { .before = "a", .after = "much longer than the line", .callback = "" },
             { .before = "much longer than the line", .after = "", .callback = "" } };
         CHECK(FindMatch(longEnds, "a line") == nullptr);
-        const std::vector<Item> emptyText{ { .text = "", .callback = "" } };  // never built by addItem
-        CHECK(FindMatch(emptyText, "") == &emptyText[0]);
+        // An empty text counts as none: the item goes by before/after.
+        const std::vector<Item> emptyText{ { .text = "", .callback = "" },
+            { .text = "", .before = "Feeding: ", .after = " points", .callback = "" } };
+        CHECK(FindMatch(emptyText, "") == nullptr);
         CHECK(FindMatch(emptyText, "x") == nullptr);
+        CHECK(FindMatch(emptyText, "Feeding: 3 points") == &emptyText[1]);
         CHECK(FindMatch({}, "Bloodlust extended") == nullptr);
         // First match wins, like the AS2 loop.
         const std::vector<Item> twice{ { .text = "a", .callback = "first" }, { .text = "a", .callback = "second" } };

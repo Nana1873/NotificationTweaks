@@ -24,7 +24,8 @@ namespace NT::B612
     inline const Item* FindMatch(std::span<const Item> a_items, std::string_view a_line)
     {
         for (const auto& item : a_items) {
-            if (item.text) {
+            // An empty text counts as none: the item goes by before/after.
+            if (item.text && !item.text->empty()) {
                 if (*item.text == a_line) {
                     return &item;
                 }

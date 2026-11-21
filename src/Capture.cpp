@@ -116,6 +116,30 @@ namespace
         AddHistory(g_nextID++, resolved);
     }
 
+    // A line B612 claimed: history only. Its repeats stack onto the row of
+    // the claimed line before them (with stacking on; shown lines in between
+    // do not break the run), so a spammer does not fill the history. No
+    // time limit, unlike shown and hidden lines: a claimed line has no
+    // lifetime, and the engine's filter already drops its repeats for 5 s.
+    std::uint64_t g_claimedHistoryID = 0;  // caller holds g_lock
+
+    void RecordClaimed(std::string_view a_raw)
+    {
+        const auto       resolved = Resolve(a_raw);
+        const auto       text = NT::Markup::Visible(resolved);
+        const auto       icons = NT::Markup::Icons(resolved);
+        const bool       stack = NT::CaptureConfig().stackDuplicates;
+        std::scoped_lock lock{ g_lock };
+        if (auto* last = stack ? FindHistory(g_claimedHistoryID) : nullptr; last && last->text == text && last->icons == icons) {
+            ++last->count;
+            last->time = std::chrono::system_clock::now();
+            logs::debug("B612 line stacked in the history (x{})", last->count);
+            return;
+        }
+        g_claimedHistoryID = g_nextID++;
+        AddHistory(g_claimedHistoryID, resolved);
+    }
+
     // Any thread except under g_lock: whether the player hid this line.
     bool IsHiddenLine(std::string_view a_raw)
     {
@@ -230,10 +254,39 @@ namespace
         logs::info("Engine repeat filter cleared after each taken line on {}", version.string());
     }
 
+    // The filter as it stood when B612 last claimed a line, and when. For
+    // that line the filter must stay as Vanilla leaves it: cleared, a
+    // repeat inside the engine's window would get through and send B612's
+    // mod event a second time. Game thread only.
+    constexpr auto                                 kRepeatFilterWindow = std::chrono::seconds(5);
+    std::array<RecentMessage, kRecentMessageSlots> g_claimedFilter{};
+    std::chrono::steady_clock::time_point          g_claimedAt{};
+    bool                                           g_claimedFilterSet = false;
+
+    void KeepClaimedInRepeatFilter()
+    {
+        if (g_recentMessages) {
+            std::copy_n(g_recentMessages, kRecentMessageSlots, g_claimedFilter.begin());
+            g_claimedAt = std::chrono::steady_clock::now();
+            g_claimedFilterSet = true;
+        }
+    }
+
+    // Clears the filter, except for the entries it held at B612's last claim
+    // (that line's, and those of lines sent in the same frame) while the
+    // engine could still act on them.
     void ClearEngineRepeatFilter()
     {
-        if (g_recentMessages && NT::CaptureConfig().stackDuplicates) {
-            std::fill_n(g_recentMessages, kRecentMessageSlots, RecentMessage{});
+        if (!g_recentMessages || !NT::CaptureConfig().stackDuplicates) {
+            return;
+        }
+        std::fill_n(g_recentMessages, kRecentMessageSlots, RecentMessage{});
+        if (g_claimedFilterSet) {
+            if (std::chrono::steady_clock::now() - g_claimedAt < kRepeatFilterWindow) {
+                std::ranges::copy(g_claimedFilter, g_recentMessages);
+            } else {
+                g_claimedFilterSet = false;
+            }
         }
     }
 
@@ -242,11 +295,12 @@ namespace
     // A line B612's NotificationManager claims is handled the way B612
     // would (hidden, its mod event sent) and not shown, like with Vanilla;
     // it is listed in the history like a line the player hid. The engine's
-    // repeat filter stays as Vanilla leaves it.
+    // repeat filter stays as Vanilla leaves it, also through later clears.
     bool Take(const char* a_text)
     {
         if (NT::B612::Consume(a_text)) {
-            RecordOnly(a_text);
+            RecordClaimed(a_text);
+            KeepClaimedInRepeatFilter();
             return true;
         }
         if (!NT::Capture::Push(a_text)) {
@@ -554,11 +608,11 @@ namespace NT::Capture
         a_visitor(g_entries);
     }
 
-    void ClearActive()
+    void ClearActive(std::string_view a_reason)
     {
         std::scoped_lock lock{ g_lock };
         if (!g_entries.empty()) {
-            logs::info("Dropped {} pending notification(s) of the previous session", g_entries.size());
+            logs::info("Dropped {} pending notification(s) ({})", g_entries.size(), a_reason);
         }
         g_entries.clear();
     }

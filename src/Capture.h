@@ -62,7 +62,9 @@ namespace NT::Capture
     // Main thread, before a save is loaded or a new game starts: drops the
     // lines of the previous session so they do not show up in the new one.
     // Loading screens inside a session keep them (they wait, see Overlay).
-    void ClearActive();
+    // Also the overlay, while the plugin is switched off. a_reason goes
+    // into the log line.
+    void ClearActive(std::string_view a_reason);
 
     // Render thread (menu): the history, oldest first, and clearing it.
     void VisitHistory(const std::function<void(const std::deque<HistoryEntry>&)>& a_visitor);
