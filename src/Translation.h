@@ -27,7 +27,8 @@ namespace NT::Translation
         std::string historyTime = "Display time for this message (numbers match any number). Right-click: back to the general setting.";
         std::string historyTimeDefault = "Default";
         std::string historyTimeOff = "Own display times work while \"Replace Vanilla notifications\" is on.";
-        std::string headAdvanced = "Advanced";
+        std::string headLayout = "Layout";
+        std::string headMenus = "Menus";
         std::string enabled = "Replace Vanilla notifications";
         std::string enabledTip = "Off: the Vanilla HUD shows notifications again.";
         std::string dragButton = "Edit layout...";
@@ -37,7 +38,7 @@ namespace NT::Translation
         std::string centerSkill = "Skills and level";
         std::string centerShout = "Words of power";
         std::string newestOnTop = "Newest line on top";
-        std::string showInMenus = "Show in menus";
+        std::string showInMenus = "Show over menus (inventory, map, journal ...)";
         std::string showInMenusTip = "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.";
         std::string maxWidth = "Max. line width";
         std::string maxVisible = "Max. visible messages";

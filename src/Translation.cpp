@@ -179,7 +179,8 @@ namespace NT::Translation
         g_strings.historyTime = Translate("$NT_HistoryTime", defaults.historyTime);
         g_strings.historyTimeDefault = Translate("$NT_HistoryTimeDefault", defaults.historyTimeDefault);
         g_strings.historyTimeOff = Translate("$NT_HistoryTimeOff", defaults.historyTimeOff);
-        g_strings.headAdvanced = Translate("$NT_HeadAdvanced", defaults.headAdvanced);
+        g_strings.headLayout = Translate("$NT_HeadLayout", defaults.headLayout);
+        g_strings.headMenus = Translate("$NT_HeadMenus", defaults.headMenus);
         g_strings.enabled = Translate("$NT_Enabled", defaults.enabled);
         g_strings.enabledTip = Translate("$NT_EnabledTip", defaults.enabledTip);
         g_strings.dragButton = Translate("$NT_DragButton", defaults.dragButton);

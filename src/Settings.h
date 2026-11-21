@@ -86,10 +86,12 @@ namespace NT
         // [Layout] PosX/PosY are fractions of the screen and mark the anchor
         // of the block: its top edge, and depending on Align its left edge,
         // horizontal center or right edge.
-        float posX = 0.025F;
-        float posY = 0.06F;
+        // Defaults match the Vanilla lines (measured against the Vanilla HUD
+        // on SE 1.5.97 at 1280x720): same corner, size and newest line on top.
+        float posX = 0.014F;
+        float posY = 0.023F;
         Align align = Align::kLeft;
-        bool  newestOnTop = false;
+        bool  newestOnTop = true;
         float maxWidth = 0.45F;  // fraction of the screen width; longer lines wrap
         int   maxVisible = 6;
         bool  showInMenus = false;  // false: lines wait while a full-screen menu (inventory, map) is open
@@ -98,7 +100,7 @@ namespace NT
         std::string font;  // ImGui font name from the SKSE Menu Framework atlas; empty = default
         // Pixels at 1080p; the overlay scales both with the screen height so
         // the defaults look the same at every resolution.
-        float       fontSize = 20.0F;
+        float       fontSize = 42.0F;
         float       lineSpacing = 3.0F;
         float       textColor[4] = { 1.0F, 1.0F, 1.0F, 1.0F };
         TextEffect  effect = TextEffect::kShadow;
@@ -107,7 +109,7 @@ namespace NT
         // [Timing]
         bool  immediate = true;      // false: one line per QueueDelay, like the Vanilla queue
         float queueDelay = 1.0F;     // seconds between lines when not immediate
-        float duration = 4.0F;       // seconds fully visible
+        float duration = 3.0F;       // seconds fully visible (Vanilla shows a line about 3 s)
         float fadeIn = 0.15F;
         float fadeOut = 0.75F;
         bool  stackDuplicates = true;  // identical visible text -> "(x2)" instead of a new line

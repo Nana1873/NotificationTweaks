@@ -173,6 +173,15 @@ namespace
         }
         Tooltip(t.dragTip);
 
+        // Grouped by topic, nothing folded away: players asked for settings
+        // (show over menus, background, fades) that sat in a collapsed
+        // "Advanced" section.
+        ImGuiMCP::SeparatorText(t.headLayout.c_str());
+        Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
+        PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, NT::Limits::kMaxWidth);
+        ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, NT::Limits::kMaxVisible.min, NT::Limits::kMaxVisible.max, "%d", kClamp);
+        Commit();
+
         ImGuiMCP::SeparatorText(t.headStyle.c_str());
         RenderFontCombo();
         ImGuiMCP::SliderFloat((t.fontSize + "##fontsize").c_str(), &s.fontSize, NT::Limits::kFontSize.min, NT::Limits::kFontSize.max, "%.0f px", kClamp);
@@ -185,6 +194,9 @@ namespace
             s.effect = static_cast<NT::TextEffect>(effect);
             NT::SaveSettings();
         }
+        ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, NT::Limits::kLineSpacing.min, NT::Limits::kLineSpacing.max, "%.0f px", kClamp);
+        Commit();
+        PercentSlider(t.background, "##background", s.backgroundAlpha, NT::Limits::kBackground);
 
         ImGuiMCP::SeparatorText(t.headTiming.c_str());
         Commit(ImGuiMCP::Checkbox((t.immediate + "##immediate").c_str(), &s.immediate));
@@ -193,24 +205,16 @@ namespace
             SecondsSlider(t.queueDelay, "##queuedelay", s.queueDelay, NT::Limits::kQueueDelay);
         }
         SecondsSlider(t.duration, "##duration", s.duration, NT::Limits::kDuration);
+        SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, NT::Limits::kFadeIn);
+        SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, NT::Limits::kFadeOut);
         Commit(ImGuiMCP::Checkbox((t.stack + "##stack").c_str(), &s.stackDuplicates));
 
-        // Values most players set once or never.
+        ImGuiMCP::SeparatorText(t.headMenus.c_str());
+        Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
+        Tooltip(t.showInMenusTip);
+
         ImGuiMCP::Spacing();
-        if (ImGuiMCP::CollapsingHeader((t.headAdvanced + "##advanced").c_str())) {
-            Commit(ImGuiMCP::Checkbox((t.newestOnTop + "##newest").c_str(), &s.newestOnTop));
-            Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
-            Tooltip(t.showInMenusTip);
-            PercentSlider(t.maxWidth, "##maxwidth", s.maxWidth, NT::Limits::kMaxWidth);
-            ImGuiMCP::SliderInt((t.maxVisible + "##maxvisible").c_str(), &s.maxVisible, NT::Limits::kMaxVisible.min, NT::Limits::kMaxVisible.max, "%d", kClamp);
-            Commit();
-            ImGuiMCP::SliderFloat((t.lineSpacing + "##spacing").c_str(), &s.lineSpacing, NT::Limits::kLineSpacing.min, NT::Limits::kLineSpacing.max, "%.0f px", kClamp);
-            Commit();
-            PercentSlider(t.background, "##background", s.backgroundAlpha, NT::Limits::kBackground);
-            SecondsSlider(t.fadeIn, "##fadein", s.fadeIn, NT::Limits::kFadeIn);
-            SecondsSlider(t.fadeOut, "##fadeout", s.fadeOut, NT::Limits::kFadeOut);
-            RenderResetDisplay();
-        }
+        RenderResetDisplay();
 
         ImGuiMCP::SeparatorText(t.headTest.c_str());
         if (ImGuiMCP::Button((t.test1 + "##test1").c_str())) {
