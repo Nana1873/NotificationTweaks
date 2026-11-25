@@ -34,7 +34,7 @@ STRINGS = [
     ("centerSkill", "Skills and level", "Skills und Stufe"),
     ("centerShout", "Words of power", "Worte der Macht"),
     ("newestOnTop", "Newest line on top", "Neueste Zeile oben"),
-    ("showInMenus", "Show over menus (inventory, map, journal ...)", "Über Menüs anzeigen (Inventar, Karte, Tagebuch ...)"),
+    ("showInMenus", "Show over menus (inventory, map ...)", "Über Menüs anzeigen (Inventar, Karte ...)"),
     ("showInMenusTip", "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.", "Aus: Solange Inventar, Karte oder ein anderes Vollbild-Menü offen ist, warten Meldungen und erscheinen nach dem Schließen."),
     ("showOverJournal", "Also over the journal (and pause menu)", "Auch über dem Tagebuch (und Pausenmenü)"),
     ("showOverJournalTip", "Off: like Vanilla, the journal stays clear and notifications appear when it closes.", "Aus: Wie bei Vanilla bleibt das Tagebuch frei, Meldungen erscheinen nach dem Schließen."),

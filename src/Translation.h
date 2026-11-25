@@ -38,7 +38,7 @@ namespace NT::Translation
         std::string centerSkill = "Skills and level";
         std::string centerShout = "Words of power";
         std::string newestOnTop = "Newest line on top";
-        std::string showInMenus = "Show over menus (inventory, map, journal ...)";
+        std::string showInMenus = "Show over menus (inventory, map ...)";
         std::string showInMenusTip = "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.";
         std::string showOverJournal = "Also over the journal (and pause menu)";
         std::string showOverJournalTip = "Off: like Vanilla, the journal stays clear and notifications appear when it closes.";
