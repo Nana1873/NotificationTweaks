@@ -205,6 +205,7 @@ namespace NT
         s.maxWidth = ReadFloat("Layout", "MaxWidth", d.maxWidth, Limits::kMaxWidth, path);
         s.maxVisible = ReadInt("Layout", "MaxVisible", d.maxVisible, Limits::kMaxVisible, path);
         s.showInMenus = ReadBool("Layout", "ShowInMenus", d.showInMenus, path);
+        s.showOverJournal = ReadBool("Layout", "ShowOverJournal", d.showOverJournal, path);
 
         s.font = ReadString("Style", "Font", d.font, path);
         s.fontSize = ReadFloat("Style", "FontSize1080", d.fontSize, Limits::kFontSize, path);
@@ -264,7 +265,7 @@ namespace NT
             { "Layout",
                 { { "PosX", f(s.posX) }, { "PosY", f(s.posY) }, { "Align", std::to_string(static_cast<int>(s.align)) },
                     { "NewestOnTop", b(s.newestOnTop) }, { "MaxWidth", f(s.maxWidth) }, { "MaxVisible", std::to_string(s.maxVisible) },
-                    { "ShowInMenus", b(s.showInMenus) } } },
+                    { "ShowInMenus", b(s.showInMenus) }, { "ShowOverJournal", b(s.showOverJournal) } } },
             { "Style",
                 { { "Font", s.font }, { "FontSize1080", f(s.fontSize) }, { "LineSpacing1080", f(s.lineSpacing) },
                     { "TextColor", std::format("{:08X}", rgba) }, { "Effect", std::to_string(static_cast<int>(s.effect)) },

@@ -192,6 +192,8 @@ namespace NT::Translation
         g_strings.newestOnTop = Translate("$NT_NewestOnTop", defaults.newestOnTop);
         g_strings.showInMenus = Translate("$NT_ShowInMenus", defaults.showInMenus);
         g_strings.showInMenusTip = Translate("$NT_ShowInMenusTip", defaults.showInMenusTip);
+        g_strings.showOverJournal = Translate("$NT_ShowOverJournal", defaults.showOverJournal);
+        g_strings.showOverJournalTip = Translate("$NT_ShowOverJournalTip", defaults.showOverJournalTip);
         g_strings.maxWidth = Translate("$NT_MaxWidth", defaults.maxWidth);
         g_strings.maxVisible = Translate("$NT_MaxVisible", defaults.maxVisible);
         g_strings.headStyle = Translate("$NT_HeadStyle", defaults.headStyle);

@@ -212,6 +212,10 @@ namespace
         ImGuiMCP::SeparatorText(t.headMenus.c_str());
         Commit(ImGuiMCP::Checkbox((t.showInMenus + "##inmenus").c_str(), &s.showInMenus));
         Tooltip(t.showInMenusTip);
+        if (s.showInMenus) {
+            Commit(ImGuiMCP::Checkbox((t.showOverJournal + "##overjournal").c_str(), &s.showOverJournal));
+            Tooltip(t.showOverJournalTip);
+        }
 
         ImGuiMCP::Spacing();
         RenderResetDisplay();

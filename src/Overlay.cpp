@@ -708,14 +708,17 @@ namespace
         // While the framework's own menu is open the lines stay visible as a
         // preview for the settings.
         const bool inMenu = !positioning && FullScreenMenuOpen(ui);
-        if (inMenu && !s.showInMenus && !SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
+        // ShowInMenus leaves out the journal (pause menu, quests) unless
+        // ShowOverJournal is on: Vanilla hides the lines there.
+        const bool overMenu = s.showInMenus && (s.showOverJournal || !ui->IsMenuOpen(RE::JournalMenu::MENU_NAME));
+        if (inMenu && !overMenu && !SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
             return;  // lines wait (and do not age) until the menu closes
         }
 
         // Paused, lines do not age. With ShowInMenus a full-screen menu
         // (barter, inventory) pauses the game, so they age anyway: frozen at
         // age 0 they would stay fully transparent (fade-in) until it closes.
-        const float dt = ui->GameIsPaused() && !positioning && !(inMenu && s.showInMenus) ? 0.0F : io->DeltaTime;
+        const float dt = ui->GameIsPaused() && !positioning && !(inMenu && overMenu) ? 0.0F : io->DeltaTime;
         const auto  entries = Tick(dt, s);
 
         const auto  screen = io->DisplaySize;

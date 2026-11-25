@@ -95,6 +95,7 @@ namespace NT
         float maxWidth = 0.45F;  // fraction of the screen width; longer lines wrap
         int   maxVisible = 6;
         bool  showInMenus = false;  // false: lines wait while a full-screen menu (inventory, map) is open
+        bool  showOverJournal = false;  // with showInMenus: false keeps the journal (and pause menu) clear, like Vanilla
 
         // [Style]
         std::string font;  // ImGui font name from the SKSE Menu Framework atlas; empty = default

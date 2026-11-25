@@ -36,6 +36,8 @@ STRINGS = [
     ("newestOnTop", "Newest line on top", "Neueste Zeile oben"),
     ("showInMenus", "Show over menus (inventory, map, journal ...)", "Über Menüs anzeigen (Inventar, Karte, Tagebuch ...)"),
     ("showInMenusTip", "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.", "Aus: Solange Inventar, Karte oder ein anderes Vollbild-Menü offen ist, warten Meldungen und erscheinen nach dem Schließen."),
+    ("showOverJournal", "Also over the journal (and pause menu)", "Auch über dem Tagebuch (und Pausenmenü)"),
+    ("showOverJournalTip", "Off: like Vanilla, the journal stays clear and notifications appear when it closes.", "Aus: Wie bei Vanilla bleibt das Tagebuch frei, Meldungen erscheinen nach dem Schließen."),
     ("maxWidth", "Max. line width", "Max. Zeilenbreite"),
     ("maxVisible", "Max. visible messages", "Max. sichtbare Meldungen"),
     ("headStyle", "Font and style", "Schrift und Stil"),

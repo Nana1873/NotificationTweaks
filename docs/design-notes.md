@@ -202,6 +202,11 @@ splits arrive 16 to 50 ms apart). Rules are checked in this order:
   paused there; frozen at age 0 they stayed invisible (fade-in alpha 0)
   until the menu closed. Verified in the barter menu without Skyrim Souls
   RE (AE 1.6.1170): `HudVisible` does not block there, the line shows.
+  Since 1.4.7 `ShowInMenus` leaves out the `JournalMenu` (quests, stats,
+  the Esc pause menu) unless `ShowOverJournal` is on, as Vanilla hides
+  the lines there (player request). Verified 2026-11-25 on SE 1.5.97:
+  ShowInMenus on, ShowOverJournal off: journal clear, the line shows after
+  closing, inventory shows it; ShowOverJournal on: the journal shows it.
   Since 1.4.4 any other menu in `UI::menuStack` that pauses the game
   counts as well (mod menus: SKSE's `CustomMenu`, used by SkyUILib's list
   menu in Skyrim Unbound Reborn). Before, lines were drawn over such a

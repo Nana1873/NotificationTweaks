@@ -40,6 +40,8 @@ namespace NT::Translation
         std::string newestOnTop = "Newest line on top";
         std::string showInMenus = "Show over menus (inventory, map, journal ...)";
         std::string showInMenusTip = "Off: while the inventory, map or another full-screen menu is open, notifications wait and appear when it closes.";
+        std::string showOverJournal = "Also over the journal (and pause menu)";
+        std::string showOverJournalTip = "Off: like Vanilla, the journal stays clear and notifications appear when it closes.";
         std::string maxWidth = "Max. line width";
         std::string maxVisible = "Max. visible messages";
         std::string headStyle = "Font and style";
